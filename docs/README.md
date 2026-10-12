@@ -23,3 +23,4 @@ https://docs.google.com/document/d/1MPfkRvoL_vhu5ddrBYVVQGAB7X8FLjinxJJNjsLvnuw/
 
 
 [발표자료]
+https://canva.link/h4172o0o8jlt1q7

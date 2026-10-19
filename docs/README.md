@@ -31,4 +31,8 @@ https://canva.link/h4172o0o8jlt1q7
 [양식 5] Product Backlog 양식
 https://docs.google.com/document/d/1ha4jypcXW3L2wTz2sfwYg7ASTuNxQPA8HpR8s8UShtE/edit?usp=sharing
 
+구글 드라이브 추가 자료 
+https://drive.google.com/drive/folders/1C2bSWMLEN7DSiAAfw0CYIQHPsGcKK_4Z?usp=sharing
+
 [발표자료]
+https://canva.link/adfmg8pg6j795s7

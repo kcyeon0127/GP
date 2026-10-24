@@ -36,3 +36,10 @@ https://drive.google.com/drive/folders/1C2bSWMLEN7DSiAAfw0CYIQHPsGcKK_4Z?usp=sha
 
 [발표자료]
 https://canva.link/adfmg8pg6j795s7
+
+---
+
+[양식 6] 시스템 구조 설계 및 개발 환경 양식
+https://docs.google.com/document/d/1GEoUsomNmimgjNj-gOL3PDdCISJfDo_irU6Clihp8Po/edit?usp=sharing
+
+[발표자료]

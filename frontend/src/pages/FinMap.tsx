@@ -139,7 +139,7 @@ export default function FinMap() {
     <div className="map-page">
       <div className="page-head" style={{ marginBottom: 10 }}>
         <Link to="/" className="back">← 홈</Link>
-        <h1 style={{ fontSize: 22 }}>금융지도</h1>
+        <h1 style={{ fontSize: 22 }}>원인 보기 · 거래관계 금융지도</h1>
       </div>
 
       <div className="map-toolbar">
@@ -246,7 +246,7 @@ export default function FinMap() {
 
         {oppOpen && (
           <section className="ov ov-opp" aria-label="연결에서 찾은 기회">
-            <h2>연결에서 찾은 기회</h2>
+            <h2>연결에서 찾은 기회 <span className="pill soon">확장 예정</span></h2>
             <p className="sub" style={{ marginBottom: 8 }}>누르면 지도에서 관련 노드를 강조합니다. 비교 정보이며 권유가 아닙니다.</p>
             {OPPS.map((o) => (
               <button type="button" key={o.id} className="opp" onClick={() => { setSelected(null); setScn((c) => ({ ...c, kind: 'none' })); setFocus(o.nodes); setOppOpen(false) }}>

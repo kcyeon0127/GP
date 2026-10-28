@@ -1,25 +1,27 @@
 import { Link } from 'react-router-dom'
-import { baseEvents, business, dayLabel, knownDelays, won } from '../data.ts'
+import { alertWindowEvents, baseEvents, business, dayLabel, knownDelays, won } from '../data.ts'
 import { base, signalOf } from '../engine.ts'
 
 // 자금 상태가 위험·주의일 때 홈 하단에 나오는 설명: 왜 부족해지는지를 예측 엔진과 데이터로 계산해서 풀어 준다.
 export default function WhyRisk() {
   const f = base.forecast
   const sig = signalOf(f)
-  const shortDay = f.firstShortDay ?? f.p10.findIndex((v, d) => d >= 1 && v < business.minBalance)
+  // 빨강은 0원, 노랑은 안전 잔액을 기준으로 처음 밑도는 날을 찾는다
+  const floor = sig.level === 'red' ? business.minBalance : business.safeBalance
+  const shortDay = f.firstShortDay ?? f.p50.findIndex((v, d) => d >= 1 && v < floor)
   if (sig.level === 'green' || shortDay <= 0) return null
 
   const level = sig.level === 'red' ? '위험' : '주의'
-  const outs = baseEvents.filter((e) => e.direction === 'out' && e.day <= shortDay).sort((a, b) => a.day - b.day)
+  const outs = alertWindowEvents.filter((e) => e.direction === 'out' && e.day <= shortDay).sort((a, b) => a.day - b.day)
   const outTotal = outs.reduce((a, e) => a + e.amount, 0)
   const ending = f.p50[shortDay]
   const available = ending + outTotal // 그날까지 쓸 수 있는 돈(예상) = 그날 잔액 + 그날까지 나간 돈
-  const need = Math.max(0, business.minBalance - f.minP50) // 끝까지 버티려면 더 필요한 돈
+  const need = Math.max(0, floor - f.minP50) // 끝까지 버티려면 더 필요한 돈
   const delayed = Object.entries(knownDelays).flatMap(([id, d]) => {
     const e = baseEvents.find((x) => x.id === id)
     return e ? [{ e, d, from: e.day - d }] : []
   })
-  const recovery = f.p50.findIndex((v, d) => d > shortDay && v >= business.minBalance)
+  const recovery = f.p50.findIndex((v, d) => d > shortDay && v >= floor)
   const max = Math.max(outTotal, available, 1)
 
   return (

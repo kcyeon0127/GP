@@ -1,7 +1,8 @@
 // M4 Forecast + M5 Scenario Engine 파일럿(클라이언트 구현). 숫자는 전부 여기서 계산한다.
-import { baseEvents, business, type CashEvent } from './data.ts'
+import { ALERT_DAYS, HORIZON_DAYS, baseEvents, business, won, type CashEvent } from './data.ts'
 
-export const HORIZON = 28
+export const HORIZON = HORIZON_DAYS // 12주
+export const WINDOW = ALERT_DAYS // 4주 경보 구간. minP50·firstShortDay는 이 구간 기준이다
 const RUNS = 600
 
 export type Shock =
@@ -20,13 +21,14 @@ export interface ModelState {
 }
 
 export interface Forecast {
-  p10: number[] // index 0 = 오늘 시작 잔액, 1..28 = 각 일 종료 잔액
+  p10: number[] // index 0 = 오늘 시작 잔액, 1..HORIZON = 각 일 종료 잔액
   p50: number[]
   p90: number[]
   shortProb: number[] // 일별 잔액 < 최소잔액 확률
   minP50: number
   minDay: number
   firstShortDay: number | null // P50 기준 첫 부족일
+  later: { minP50: number; minDay: number; firstShortDay: number | null } // 5~12주 구간 요약
   eventRisk: Record<string, number> // 지출 이벤트 당일 직후 잔액 부족 확률
 }
 
@@ -142,28 +144,34 @@ export function forecast(state: ModelState, seed = 7): Forecast {
     p90.push(q(s, 0.9))
     shortProb.push(s.filter((v) => v < business.minBalance).length / s.length)
   }
+  const { minP50, minDay, firstShortDay } = summarize(p50, 1, WINDOW)
+  const later = summarize(p50, WINDOW + 1, HORIZON)
+  const eventRisk: Record<string, number> = {}
+  for (const k of Object.keys(riskHits)) eventRisk[k] = riskHits[k] / RUNS
+  return { p10, p50, p90, shortProb, minP50, minDay, firstShortDay, later, eventRisk }
+}
+
+function summarize(p50: number[], from: number, to: number) {
   let minP50 = Infinity
-  let minDay = 0
+  let minDay = from
   let firstShortDay: number | null = null
-  for (let d = 1; d <= HORIZON; d++) {
+  for (let d = from; d <= to; d++) {
     if (p50[d] < minP50) {
       minP50 = p50[d]
       minDay = d
     }
     if (firstShortDay === null && p50[d] < business.minBalance) firstShortDay = d
   }
-  const eventRisk: Record<string, number> = {}
-  for (const k of Object.keys(riskHits)) eventRisk[k] = riskHits[k] / RUNS
-  return { p10, p50, p90, shortProb, minP50, minDay, firstShortDay, eventRisk }
+  return { minP50, minDay, firstShortDay }
 }
 
-// M6 조기경보 규칙
+// M6 조기경보 규칙 (양식 6 무결성 규칙 6): 4주 안에 0원 미만 → 빨강, 안전 잔액 미만 → 노랑, 그 외 초록
 export function signalOf(f: Forecast): { level: Signal; reason: string } {
-  const red = f.p50.findIndex((v, d) => d >= 1 && d <= 14 && v < business.minBalance)
-  if (red > 0) return { level: 'red', reason: `${red}일 뒤 잔액이 최소 유지 잔액 아래로 내려갑니다.` }
-  const yellow = f.p10.findIndex((v, d) => d >= 1 && d <= 28 && v < business.minBalance)
-  if (yellow > 0) return { level: 'yellow', reason: `${yellow}일 뒤 상황이 나빠지면 잔액이 부족해질 수 있습니다.` }
-  return { level: 'green', reason: '28일 안에 잔액 부족 신호가 없습니다.' }
+  const red = f.p50.findIndex((v, d) => d >= 1 && d <= WINDOW && v < business.minBalance)
+  if (red > 0) return { level: 'red', reason: `${red}일 뒤 잔액이 0원 아래로 내려갑니다.` }
+  const yellow = f.p50.findIndex((v, d) => d >= 1 && d <= WINDOW && v < business.safeBalance)
+  if (yellow > 0) return { level: 'yellow', reason: `${yellow}일 뒤 잔액이 안전 잔액(${won(business.safeBalance)})보다 적어집니다.` }
+  return { level: 'green', reason: `4주 안에 잔액이 안전 잔액(${won(business.safeBalance)}) 아래로 내려가지 않습니다.` }
 }
 
 export interface Diff {

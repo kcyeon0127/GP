@@ -43,7 +43,7 @@ export default function Simulation() {
     <>
       <div className="page-head">
         <Link to="/" className="back">← 홈</Link>
-        <h1>What-if 시뮬레이션</h1>
+        <h1>시나리오: 이러면 어떻게 될까요?</h1>
       </div>
       <div className="hub-grid">
         <div className="stack">

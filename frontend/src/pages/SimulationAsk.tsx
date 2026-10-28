@@ -87,8 +87,8 @@ export default function SimulationAsk() {
   return (
     <>
       <div className="page-head">
-        <Link to="/simulation" className="back">← What-if 홈</Link>
-        <h1>What-if 시뮬레이션</h1>
+        <Link to="/simulation" className="back">← 시나리오</Link>
+        <h1>시나리오: 말로 물어보기 <span className="pill soon">확장 예정</span></h1>
       </div>
 
       <form className="card ask" onSubmit={(e) => { e.preventDefault(); submit(query) }}>

@@ -11,7 +11,7 @@ export interface CashEvent {
   id: string
   label: string
   kind: EventKind
-  day: number // 오늘 기준 +N일 (1~28)
+  day: number // 오늘 기준 +N일 (1~HORIZON_DAYS)
   amount: number // 원, 항상 양수
   direction: 'in' | 'out'
   partnerId?: string
@@ -33,7 +33,8 @@ export interface Business {
   region: string
   openedAt: string
   startBalance: number
-  minBalance: number
+  minBalance: number // 이 값 아래로 내려가면 부족(빨강)
+  safeBalance: number // 이 값 아래로 내려가면 주의(노랑)
   salesPerDay: number
   loanBalances: Record<string, number>
 }
@@ -45,6 +46,7 @@ export const business: Business = {
   openedAt: '2021-03-15',
   startBalance: isRisk ? 2_900_000 : 3_200_000,
   minBalance: 0,
+  safeBalance: 500_000,
   salesPerDay: 230_000,
   loanBalances: { L1: 62_000_000, L2: 18_000_000 },
 }
@@ -56,8 +58,9 @@ export const partners: Partner[] = [
   { id: 'P4', name: '대성유통', role: 'purchase', taxStatus: '계속사업자' },
 ]
 
-export const baseEvents: CashEvent[] = [
-  { id: 'S1', label: '한빛식자재 정산', kind: 'settlement', day: 6 + (knownDelays.S1 ?? 0), amount: 3_200_000, direction: 'in', partnerId: 'P1', delay: { mean: 2, sd: 2 } },
+// 이번 달 일정. 매달 같은 날짜에 반복되고(US-01·02), 다음 달 이후 분은 repeatMonthly가 만든다.
+export const monthlyEvents: CashEvent[] = [
+  { id: 'S1', label: '한빛식자재 정산', kind: 'settlement', day: 6, amount: 3_200_000, direction: 'in', partnerId: 'P1', delay: { mean: 2, sd: 2 } },
   { id: 'S2', label: '청춘마켓 정산', kind: 'settlement', day: 12, amount: 2_100_000, direction: 'in', partnerId: 'P2', delay: { mean: 3, sd: 3 } },
   { id: 'S3', label: '온누리푸드 정산', kind: 'settlement', day: 20, amount: 4_000_000, direction: 'in', partnerId: 'P3', delay: { mean: 1, sd: 2 } },
   { id: 'F1', label: '임대료', kind: 'fixed', day: 5, amount: 1_500_000, direction: 'out' },
@@ -68,6 +71,41 @@ export const baseEvents: CashEvent[] = [
   { id: 'L1', label: '운영자금대출 상환', kind: 'loan', day: 14, amount: 2_400_000, direction: 'out', loanId: 'L1', floatingRate: true },
   { id: 'L2', label: '시설자금대출 상환', kind: 'loan', day: 25, amount: 900_000, direction: 'out', loanId: 'L2' },
 ]
+
+export const HORIZON_DAYS = 84 // 12주 예측
+export const ALERT_DAYS = 28 // 4주 조기경보 구간
+
+const TODAY_UTC = Date.UTC(2026, 9, 1)
+const DAY_MS = 86_400_000
+
+// m개월 뒤 같은 날짜의 오늘 기준 일수. 그 달에 같은 날짜가 없으면 말일로 당긴다(31일 → 30일).
+function sameDateLater(day: number, m: number): number {
+  const d = new Date(TODAY_UTC + day * DAY_MS)
+  const y = d.getUTCFullYear()
+  const mo = d.getUTCMonth() + m
+  const last = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate()
+  return Math.round((Date.UTC(y, mo, Math.min(d.getUTCDate(), last)) - TODAY_UTC) / DAY_MS)
+}
+
+function repeatMonthly(events: CashEvent[]): CashEvent[] {
+  const out: CashEvent[] = []
+  for (let m = 1; ; m++) {
+    const next = events
+      .map((e) => ({ ...e, id: `${e.id}-${m + 1}`, day: sameDateLater(e.day, m), delay: e.delay && { ...e.delay } }))
+      .filter((e) => e.day <= HORIZON_DAYS)
+    if (!next.length) return out
+    out.push(...next)
+  }
+}
+
+// 이미 확정된 지연은 이번 달 정산에만 반영한다. 다음 달 이후 분은 ID에 -2, -3이 붙는다.
+export const baseEvents: CashEvent[] = [
+  ...monthlyEvents.map((e) => ({ ...e, day: e.day + (knownDelays[e.id] ?? 0) })),
+  ...repeatMonthly(monthlyEvents),
+]
+
+// 경보 구간(4주) 안의 일정. 홈 목록과 근거 설명은 이 범위만 쓴다.
+export const alertWindowEvents: CashEvent[] = baseEvents.filter((e) => e.day <= ALERT_DAYS)
 
 export interface PolicyProduct {
   name: string

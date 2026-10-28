@@ -85,8 +85,6 @@ svg.chart { max-width: 100%; }
 .row:last-child { border-bottom: 0; }
 .pill { flex: none; align-self: center; font-size: 12px; padding: 1px 9px; border-radius: 999px; background: var(--brand-bg); color: var(--brand); font-weight: 600; white-space: nowrap; }
 .pill.red { background: var(--red-bg); color: var(--red); } .pill.yellow { background: var(--yellow-bg); color: var(--yellow); }
-.ai-entry { position: fixed; left: calc(220px + (100vw - 220px - 290px - 24px) / 2); bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: var(--ink); color: var(--bg); border: 0; border-radius: 999px; padding: 11px 22px; box-shadow: 0 10px 30px rgba(0,0,0,.2); text-decoration: none; font-weight: 600; z-index: 5; }
-.ai-entry:hover { background: var(--brand); color: #fff; }
 
 /* 차트 */
 .chart text { fill: var(--muted); font-size: 11px; }
@@ -285,7 +283,6 @@ input[type='range'] { accent-color: var(--brand); }
   .tiles { grid-template-columns: minmax(0, 1fr); }
   .widgets { position: static; height: auto; min-height: 0; grid-template-rows: none; }
   .wscroll { max-height: 220px; }
-  .ai-entry { left: 50%; bottom: 14px; padding: 12px 20px; }
   .kpis { gap: 8px; }
   .kpi { padding: 10px; } .kpi b { font-size: 16px; }
   .ask-row { flex-direction: column; }
@@ -305,3 +302,11 @@ input[type='range'] { accent-color: var(--brand); }
   .legend-row { gap: 4px 10px; }
   .foot { margin-top: 12px; }
 }
+/* 12주 요약 줄, 확장 예정 표시 */
+.later { margin-top: 8px; font-size: 13.5px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.later .bad { color: var(--red); }
+.link-btn { margin-left: auto; background: none; border: 0; padding: 0; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.pill.soon { background: var(--rule); color: var(--muted); font-weight: 500; }
+.ask-entry { margin-top: 20px; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.ask-entry a { color: var(--muted); }

@@ -47,7 +47,7 @@ export default function Agent() {
       const t = ranked[0]
       return { who: 'bot', text: `계산된 대응안 중 효과가 가장 큰 것은 "${t.title}"입니다. 최저 잔액이 ${won(t.gain)}만큼 개선됩니다. 오른쪽 목록에서 다른 안과 비교해 보세요.` }
     }
-    return { who: 'bot', text: `기준 상태로는 28일 안에 부족 신호가 없지만 여유가 크지 않습니다. 주요 거래처 정산이 늦어지는 경우를 가정해 보려면 "한빛식자재 정산이 2주 밀리면?"을 눌러 보세요.` }
+    return { who: 'bot', text: `기준 상태로는 4주 안에 부족 신호가 없지만 여유가 크지 않습니다. 주요 거래처 정산이 늦어지는 경우를 가정해 보려면 "한빛식자재 정산이 2주 밀리면?"을 눌러 보세요.` }
   }
 
   const [msgs, setMsgs] = useState<Msg[]>([{ who: 'bot', text: isRisk ? `안녕하세요. 지금 자금 상태는 "위험"입니다. 한빛식자재 정산이 14일 늦어지는 것으로 확정되어 ${crisis.firstShortDay ? dayLabel(crisis.firstShortDay) : ''}부터 잔액이 부족해요. 오른쪽에 효과가 계산된 대응안을 순위로 정리했습니다.` : `안녕하세요. 현재 가정한 위기 상황(한빛식자재 정산 14일 지연)에서 자금 상태는 "${sig.level === 'red' ? '위험' : '주의'}"입니다. 오른쪽에 효과가 계산된 대응안을 순위로 정리했습니다.` }])
@@ -62,7 +62,7 @@ export default function Agent() {
     <>
       <div className="page-head">
         <Link to="/" className="back">← 홈</Link>
-        <h1>대응 에이전트</h1>
+        <h1>대응안: 무엇부터 할까요?</h1>
       </div>
       <div className="agent-grid">
         <div>

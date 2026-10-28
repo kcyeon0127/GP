@@ -1,7 +1,7 @@
 // Graph RAG 검색 계층(M7+M8 파일럿). 사용자 상황(거래처·정산·대출)과 금융상품 정보를 그래프로 보고,
 // 계획(Plan)이 가리키는 앵커에서 이웃 노드를 따라가며 근거(Evidence)를 모은다.
 // 근거는 ID(E1…)가 붙어 LLM 컨텍스트, 화면 표시, 응답 검증(M9)에 같이 쓰인다.
-import { baseEvents, business, dayLabel, partners, policyProducts, won } from './data.ts'
+import { alertWindowEvents as baseEvents, business, dayLabel, partners, policyProducts, won } from './data.ts'
 import type { Shock } from './engine.ts'
 
 export interface Evidence {
@@ -44,7 +44,7 @@ export function retrieve(shocks: Shock[]): RetrievalResult {
     }
     if (k.type === 'revenue_drop') {
       const total = baseEvents.filter((e) => e.kind === 'settlement').reduce((a, e) => a + e.amount, 0)
-      add('situation', `28일 안에 받을 정산 합계는 ${won(total)}이고 일 평균 현장 매출은 ${won(business.salesPerDay)}입니다.`, baseEvents.filter((e) => e.kind === 'settlement').map((e) => e.id))
+      add('situation', `4주 안에 받을 정산 합계는 ${won(total)}이고 일 평균 현장 매출은 ${won(business.salesPerDay)}입니다.`, baseEvents.filter((e) => e.kind === 'settlement').map((e) => e.id))
     }
     if (k.type === 'rate_up') {
       baseEvents.filter((e) => e.floatingRate && e.loanId).forEach((e) => {

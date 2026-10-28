@@ -24,7 +24,7 @@ export function resultEvidence(start: number, shocks: Shock[], base: Forecast, n
     id: id(0),
     kind: 'result',
     nodes: [],
-    text: `가정(${shocks.map(describeShock).join(', ')})을 적용하면 28일 동안의 예상 최저 잔액은${won(base.minP50)} → ${won(next.minP50)}(변화 ${won(diff.minP50Delta)})이고, 자금 상태는 ${SIGNAL_KO[level]}입니다.`,
+    text: `가정(${shocks.map(describeShock).join(', ')})을 적용하면 4주 동안의 예상 최저 잔액은${won(base.minP50)} → ${won(next.minP50)}(변화 ${won(diff.minP50Delta)})이고, 자금 상태는 ${SIGNAL_KO[level]}입니다.`,
   })
   out.push({
     id: id(1),
@@ -32,7 +32,7 @@ export function resultEvidence(start: number, shocks: Shock[], base: Forecast, n
     nodes: [],
     text: diff.firstShortAfter
       ? `첫 부족 예상일은 ${dayLabel(diff.firstShortAfter)}입니다.`
-      : '28일 안에 잔액이 최소 유지 잔액 아래로 내려가는 날은 없습니다.',
+      : '4주 안에 잔액이 0원 아래로 내려가는 날은 없습니다.',
   })
   if (diff.newlyRisky.length) {
     out.push({

@@ -1,32 +1,33 @@
-# React + TypeScript + Vite
+# 상생여지도 프론트엔드
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript + Vite. 지금은 합성 데이터와 브라우저 안 계산 엔진(`src/engine.ts`)으로 동작하는 시연 버전이다.
+백엔드(FastAPI)가 준비되면 `src/data.ts`와 `src/engine.ts`의 계산을 API 호출로 바꾼다.
 
-Currently, two official plugins are available:
+## 실행
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cd frontend
+npm install
+npm run dev              # 기본: 자금 상태 안정
+VITE_DEMO=risk npm run dev   # 위험 상황 데모: 한빛식자재 정산 14일 지연 확정
+npm test                 # 위험 전파 엔진 테스트 (기본 모드 기준)
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## 화면
+
+| 메뉴 | 경로 | 관련 US |
+| --- | --- | --- |
+| 홈 (4주 경보, 12주 잔액) | `/` | US-03·04·05 |
+| 원인 보기 (거래관계 금융지도) | `/map` | US-06·07·08 |
+| 시나리오 | `/simulation` | US-09 |
+| 대응안 | `/agent` | US-10·11 |
+| 내 거래·일정 (읽기 전용, 등록 기능 예정) | `/ledger` | US-01·02·03 |
+
+자연어 시나리오 질문, 금융 뉴스, 연결에서 찾은 기회는 범위 밖 기능이라 화면에 "확장 예정"이나 "샘플"로 표시한다.
+
+## 계산 규칙 (양식 6 기준)
+
+- 예측 구간 12주(84일), 경보 구간 4주(28일)
+- 4주 안에 예상 잔액이 0원 미만이면 빨강, 안전 잔액 미만이면 노랑, 그 외 초록
+- 매달 반복 일정은 같은 날짜에 생기고, 그 달에 없는 날짜는 말일로 당긴다

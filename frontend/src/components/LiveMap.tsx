@@ -6,7 +6,7 @@ import { won } from '../data.ts'
 
 const KO: Record<string, string> = { Business: '사업장', Counterparty: '거래처', Contract: '계약', FixedCost: '고정비', Loan: '대출' }
 const CONTRACT_KO: Record<string, string> = { SALES: '매출 계약', PURCHASE: '매입 계약', LEASE: '고정비 계약', LOAN: '대출 약정' }
-const COLOR: Record<string, string> = { Business: '#1f6f5c', Counterparty: '#3b82f6', Contract: '#9ca3af', FixedCost: '#d97706', Loan: '#b45309' }
+const COLOR: Record<string, string> = { Business: '#2f5bd3', Counterparty: '#7a8aa6', Contract: '#9ca3af', FixedCost: '#d97706', Loan: '#b45309' }
 
 function labelOf(n: GraphDto['nodes'][number]): string {
   const p = n.props as Record<string, string | number>

@@ -1,0 +1,23 @@
+# 로컬·시연용 DB (양식 6 §4). 실행: docker compose up -d
+services:
+  postgres:
+    image: pgvector/pgvector:0.7.4-pg16
+    environment:
+      POSTGRES_USER: gp
+      POSTGRES_PASSWORD: gp
+      POSTGRES_DB: gp
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gp"]
+      interval: 3s
+      retries: 20
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: neo4j/gp-password
+    ports: ["7474:7474", "7687:7687"]
+    volumes: [neo4jdata:/data]
+volumes:
+  pgdata:
+  neo4jdata:

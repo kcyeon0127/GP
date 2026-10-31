@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useApiStatus } from '../api.ts'
 import GraphView, { type EdgeMark, type NodeMark } from '../components/GraphView.tsx'
 import Legend from '../components/Legend.tsx'
 import { dayLabel, won } from '../data.ts'
@@ -49,6 +50,7 @@ function describe(sh: GraphShock): string {
 }
 
 export default function FinMap() {
+  const live = useApiStatus()
   // 링크로 상태를 공유할 수 있다: /map?node=L1  /map?partner=P1&days=14
   const q = new URLSearchParams(window.location.search)
   const [selected, setSelected] = useState<string | null>(() => (nodeById.has(q.get('node') ?? '') ? q.get('node') : null))
@@ -140,6 +142,7 @@ export default function FinMap() {
       <div className="page-head" style={{ marginBottom: 10 }}>
         <Link to="/" className="back">← 홈</Link>
         <h1 style={{ fontSize: 22 }}>원인 보기 · 거래관계 금융지도</h1>
+        {live && <Link to="/map/mine" className="btn ghost" style={{ marginLeft: 'auto' }}>내 등록 데이터로 보기</Link>}
       </div>
 
       <div className="map-toolbar">

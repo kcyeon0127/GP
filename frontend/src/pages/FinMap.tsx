@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApiStatus } from '../api.ts'
 import GraphView, { type EdgeMark, type NodeMark } from '../components/GraphView.tsx'
-import Legend from '../components/Legend.tsx'
+import { EdgeLegend, GroupIcon } from '../components/Legend.tsx'
 import { dayLabel, won } from '../data.ts'
 import { isRisk } from '../demo.ts'
 import { graph, nodeById, type GraphNode } from '../data/financeGraph.ts'
@@ -146,9 +146,9 @@ export default function FinMap() {
       </div>
 
       <div className="map-toolbar">
-        <div className="seg" role="group" aria-label="보이는 종류">
+        <div className="seg kinds" role="group" aria-label="보이는 종류 (누르면 지도에서 켜고 끔)">
           {GROUPS.map((g) => (
-            <button key={g.id} className={shown.has(g.id) ? 'on' : ''} aria-pressed={shown.has(g.id)} onClick={() => toggle(g.id)}>{g.label}</button>
+            <button key={g.id} className={shown.has(g.id) ? 'on' : ''} aria-pressed={shown.has(g.id)} onClick={() => toggle(g.id)}><GroupIcon group={g.id} />{g.label}</button>
           ))}
         </div>
         <div className="scn">
@@ -204,7 +204,7 @@ export default function FinMap() {
           기회 {OPPS.length}
         </button>
       </div>
-      <Legend />
+      <EdgeLegend />
 
       <div className="graph-wrap fill">
         <GraphView

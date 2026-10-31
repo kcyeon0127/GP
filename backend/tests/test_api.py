@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from app.config import EMBEDDING_API_KEY, EMBEDDING_URL
 from app.db import Base, engine
 from app.main import app
+from app.repositories import graph_repository
 
 
 @pytest.fixture(scope="module")
@@ -20,9 +21,15 @@ def client():
     with engine.begin() as conn:
         conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS vector")
     Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    # Neo4j는 개발 DB와 같이 쓰므로, 테스트 행의 ID가 개발 데이터 ID와 겹치지 않게 시퀀스를 띄운다
+    with engine.begin() as conn:
+        for (seq,) in conn.exec_driver_sql("SELECT sequence_name FROM information_schema.sequences"):
+            conn.exec_driver_sql(f"ALTER SEQUENCE {seq} RESTART WITH 1000000")
     with TestClient(app) as c:
         c.post("/api/forecasts", json={"base_date": "2026-11-01", "current_balance": 1_000_000, "safety_balance": 1_000_000})
         yield c
+    graph_repository.query("MATCH (n {business_id: 999}) DETACH DELETE n")
 
 
 def embedding_up() -> bool:
@@ -104,7 +111,8 @@ def test_evidence_paths(client):
     ev = client.get(f"/api/alerts/{run_id}/evidence").json()
     ids = [e["id"] for e in ev["evidence"]]
     assert ids and ids[0] == "P1" and ev["message"] is None
-    assert any("운영자금대출" in e["text"] and "○○은행" in e["text"] for e in ev["evidence"])
+    assert any(e["text"].startswith("사업장 → 운영자금대출 → ○○은행 대출 약정 → 11/25") for e in ev["evidence"])
+    assert len({e["ref"] for e in ev["evidence"]}) == len(ev["evidence"])  # 같은 근거가 두 번 나오지 않는다
 
 
 def test_evidence_none_when_green(client):

@@ -4,6 +4,8 @@ import BalanceChart from '../components/BalanceChart.tsx'
 import MiniMap from '../components/MiniMap.tsx'
 import Signal from '../components/Signal.tsx'
 import WhyRisk from '../components/WhyRisk.tsx'
+import LiveDashboard from '../components/LiveDashboard.tsx'
+import { useApiStatus } from '../api.ts'
 import { HORIZON, WINDOW, base, signalOf } from '../engine.ts'
 import { alertWindowEvents, dayLabel, news, pastBalances, won } from '../data.ts'
 
@@ -12,6 +14,22 @@ const upcoming = alertWindowEvents.filter((e) => e.direction === 'out').sort((a,
 const incoming = alertWindowEvents.filter((e) => e.kind === 'settlement').sort((a, b) => a.day - b.day)
 
 export default function Main() {
+  const live = useApiStatus()
+  if (live) return <LiveHome />
+  return <DemoHome checking={live === null} />
+}
+
+function LiveHome() {
+  return (
+    <>
+      <div className="page-head"><h1>오늘의 자금 현황</h1></div>
+      <LiveDashboard />
+      <p className="ask-entry"><Link to="/map">거래관계 금융지도 보기 →</Link></p>
+    </>
+  )
+}
+
+function DemoHome({ checking }: { checking: boolean }) {
   const f = base.forecast
   const [full, setFull] = useState(false)
   const later = f.later
@@ -19,6 +37,7 @@ export default function Main() {
   return (
     <>
       <div className="page-head"><h1>오늘의 자금 현황</h1></div>
+      {!checking && <p className="banner">서버에 연결되지 않아 합성 데이터 시연 화면을 보여 드려요.</p>}
       <div className="main-grid">
         <div className="stack">
           <Signal {...sig} />

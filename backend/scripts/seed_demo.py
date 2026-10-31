@@ -12,7 +12,7 @@ from sqlalchemy import delete, select
 
 from app.db import SessionLocal, init_db
 from app.main import app
-from app.models import Business, Contract, Counterparty, Document, DocumentChunk, FixedCost, Loan
+from app.models import CashEvent, Contract, Counterparty, Document, DocumentChunk, FixedCost, Loan
 from app.repositories import embedding_client
 from app.repositories.business import get_or_create
 
@@ -40,7 +40,7 @@ DOC_PARTY = {"D01": "한빛식자재", "D02": "청춘마켓", "D03": "온누리�
 
 
 def reset(s, bid):
-    for model in (Document, FixedCost, Loan, Counterparty):
+    for model in (CashEvent, Document, FixedCost, Loan, Counterparty):
         s.execute(delete(model).where(model.business_id == bid))
     s.commit()
 

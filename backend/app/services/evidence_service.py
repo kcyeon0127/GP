@@ -16,16 +16,15 @@ from ..repositories import graph_repository as g
 from . import forecast_service
 
 PATH_CYPHER = """
-MATCH (e:CashEvent) WHERE e.cash_event_id IN $ids
-OPTIONAL MATCH p1 = (:Counterparty)-[:PARTY_TO]->(:Contract)-[:GENERATES]->(e)
-OPTIONAL MATCH p2 = (:Counterparty)-[:PARTY_TO]->(:Contract)<-[:BASED_ON]-(src)-[:GENERATES]->(e)
-OPTIONAL MATCH p3 = (:Business)-[:PAYS|BORROWS]->(src2)-[:GENERATES]->(e)
-WITH e, coalesce(p1, p2, p3) AS p
-WHERE p IS NOT NULL
-RETURN e.cash_event_id AS event_id, e.due_date AS due_date,
-       [n IN nodes(p) | {label: labels(n)[0], name: coalesce(n.name, n.label, n.contract_type), contract_id: n.contract_id}] AS nodes
-ORDER BY e.due_date
+MATCH (src)-[:GENERATES]->(e:CashEvent) WHERE e.cash_event_id IN $ids
+OPTIONAL MATCH (src)-[:BASED_ON]->(base:Contract)
+WITH e, src, CASE WHEN src:Contract THEN src ELSE base END AS k
+OPTIONAL MATCH (c:Counterparty)-[:PARTY_TO]->(k)
+RETURN e.cash_event_id AS event_id, e.due_date AS due_date, labels(src)[0] AS src_label, src.name AS src_name,
+       k.contract_id AS contract_id, k.contract_type AS contract_type, c.name AS counterparty
+ORDER BY e.due_date, e.cash_event_id
 """
+CONTRACT_KO = {"SALES": "매출 계약", "PURCHASE": "매입 계약", "LEASE": "계약", "LOAN": "대출 약정"}
 
 
 def collect(s: Session, r: ForecastRun) -> dict:
@@ -33,24 +32,27 @@ def collect(s: Session, r: ForecastRun) -> dict:
     if not drv:
         return {"run_id": r.run_id, "evidence": [], "message": "근거 없음"}
     by_id = {e.cash_event_id: (e, role) for e, role in drv}
-    paths = g.query(PATH_CYPHER, ids=list(by_id))
     items: list[dict] = []
-    contract_ids: list[int] = []
-    for p in sorted(paths, key=lambda x: (x["due_date"], x["event_id"])):
+    contract_events: dict[int, list] = {}
+    for p in g.query(PATH_CYPHER, ids=list(by_id)):
         e, role = by_id[p["event_id"]]
-        names = [n["name"] for n in p["nodes"] if n["name"]]
-        cids = [n["contract_id"] for n in p["nodes"] if n["label"] == "Contract" and n["contract_id"]]
-        contract_ids += [c for c in cids if c not in contract_ids]
+        contract = f"{p['counterparty']} {CONTRACT_KO.get(p['contract_type'], '계약')}" if p["contract_id"] else None
+        if p["src_label"] == "Contract":
+            chain = [contract]
+        else:  # 고정비·대출: 사업장 → 고정비/대출 → (근거 계약)
+            chain = ["사업장", p["src_name"]] + ([contract] if contract else [])
         when = "경보일 전에 나가는 돈" if role == "BEFORE" else "경보일 뒤에 들어오는 돈"
-        items.append(dict(ref_type=EvidenceRef.GRAPH_PATH, ref_id=f"event:{e.cash_event_id}", contract_ids=cids,
-                          text=f"{' → '.join(names)} · {e.due_date:%m/%d} {e.label} {e.amount:,}원 ({when})"))
-    if contract_ids:
-        query = " ".join(sorted({e.label for e, _ in drv})) + " 지급 지연 연체 결제 조건"
+        items.append(dict(ref_type=EvidenceRef.GRAPH_PATH, ref_id=f"event:{e.cash_event_id}",
+                          text=f"{' → '.join(chain)} → {e.due_date:%m/%d} {e.label} {e.amount:,}원 ({when})"))
+        if p["contract_id"]:
+            contract_events.setdefault(p["contract_id"], []).append(e)
+    # 경로에 나온 계약마다 그 계약서에서 가장 관련 있는 조항 1개 (유사도가 기준 이상일 때만)
+    for cid, evs in contract_events.items():
+        query = f"{evs[0].label} 지급 지연 연체 시 조항"
         vec = embedding_client.embed([query])[0]
-        for chunk, doc, score in document_repository.search(s, r.business_id, vec, limit=2 * len(contract_ids), contract_ids=contract_ids):
+        for chunk, doc, score in document_repository.search(s, r.business_id, vec, limit=1, contract_ids=[cid]):
             if score >= EVIDENCE_MIN_SCORE:
-                items.append(dict(ref_type=EvidenceRef.DOCUMENT_CHUNK, ref_id=chunk.key, contract_ids=[chunk.contract_id],
-                                  text=f"{doc.title} {chunk.text}", score=round(score, 3)))
+                items.append(dict(ref_type=EvidenceRef.DOCUMENT_CHUNK, ref_id=chunk.key, text=f"{doc.title} {chunk.text}", score=round(score, 3)))
 
     s.execute(delete(Evidence).where(Evidence.run_id == r.run_id))
     out, n_p, n_d = [], 0, 0

@@ -33,6 +33,10 @@ export default function LiveDashboard() {
     : `4주 안에 잔액이 안전 잔액(${won(f.safety_balance)}) 아래로 내려가지 않습니다.`
   const daily = f.daily ?? []
   const alertEnd = daily[27]?.date
+  // 0원 위·아래 색을 나누는 그라디언트 위치 (위쪽 끝 = 0, 아래쪽 끝 = 1)
+  const hi = Math.max(0, ...daily.map((d) => d.balance))
+  const lo = Math.min(0, ...daily.map((d) => d.balance))
+  const zeroAt = hi === lo ? 1 : hi / (hi - lo)
   const toggleDrivers = () => {
     if (f.signal === 'GREEN') return
     if (drivers) return setDrivers(null)
@@ -72,20 +76,30 @@ export default function LiveDashboard() {
 
       <section className="card">
         <h2>향후 12주 예상 잔액</h2>
-        <p className="sub">기준일 {md(f.base_date)} · 현재 잔액 {won(f.start_balance)} · 음영은 4주 경보 구간, 점선은 안전 잔액이에요.</p>
+        <p className="sub">기준일 {md(f.base_date)} · 현재 잔액 {won(f.start_balance)} · 회색 음영은 4주 경보 구간, 노란 점선은 안전 잔액, 빨간 부분은 0원 아래(부족)예요.</p>
         {!f.has_events && <p className="empty-note">{f.message} <Link to="/ledger">일정 등록하기 →</Link></p>}
         <div style={{ width: '100%', height: 260 }}>
           <ResponsiveContainer>
             <ComposedChart data={daily} margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
+              <defs>
+                <linearGradient id="bal-stroke" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset={zeroAt} stopColor="var(--band)" />
+                  <stop offset={zeroAt} stopColor="var(--red)" />
+                </linearGradient>
+                <linearGradient id="bal-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset={zeroAt} stopColor="var(--band)" stopOpacity={0.14} />
+                  <stop offset={zeroAt} stopColor="var(--red)" stopOpacity={0.22} />
+                </linearGradient>
+              </defs>
               <CartesianGrid stroke="var(--rule)" vertical={false} />
               <XAxis dataKey="date" tickFormatter={md} interval={13} tick={{ fontSize: 11, fill: 'var(--muted)' }} />
               <YAxis tickFormatter={(v: number) => `${Math.round(v / 10000)}만`} width={52} tick={{ fontSize: 11, fill: 'var(--muted)' }} />
               <Tooltip formatter={(v: number) => [won(v), '예상 잔액']} labelFormatter={(l: string) => md(l)} />
-              {alertEnd && <ReferenceArea x1={daily[0].date} x2={alertEnd} fill="var(--band)" fillOpacity={0.08} />}
+              {alertEnd && <ReferenceArea x1={daily[0].date} x2={alertEnd} fill="var(--muted)" fillOpacity={0.07} />}
               <ReferenceLine y={f.safety_balance} stroke="var(--yellow)" strokeDasharray="4 4" />
-              <ReferenceLine y={0} stroke="var(--red)" strokeDasharray="2 3" />
-              <Area type="stepAfter" dataKey="balance" stroke="none" fill="var(--band)" fillOpacity={0.12} isAnimationActive={false} />
-              <Line type="stepAfter" dataKey="balance" stroke="var(--band)" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Area type="stepAfter" dataKey="balance" baseValue={0} stroke="none" fill="url(#bal-fill)" isAnimationActive={false} />
+              <ReferenceLine y={0} stroke="var(--ink)" strokeWidth={1.2} label={{ value: '0원', position: 'insideTopLeft', fontSize: 11, fill: 'var(--muted)' }} />
+              <Line type="stepAfter" dataKey="balance" stroke="url(#bal-stroke)" strokeWidth={2} dot={false} isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

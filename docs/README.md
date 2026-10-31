@@ -43,3 +43,12 @@ https://canva.link/adfmg8pg6j795s7
 https://docs.google.com/document/d/1GEoUsomNmimgjNj-gOL3PDdCISJfDo_irU6Clihp8Po/edit?usp=sharing
 
 [발표자료]
+
+[양식 7-1] sprint planning
+https://docs.google.com/document/d/13huh-leDCQWCsKxJyxOKmHT78RMbThDLOvADD-vVkRU/edit?tab=t.0
+
+[양식 7-2] sprint backlog
+https://docs.google.com/document/d/1nEYjC1LvDHLeroL29KqfdHv0PZI0LNSct_2dDeXKrDQ/edit?tab=t.0
+
+[발표자료]
+

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from .api import counterparties
+from .api import counterparties, fixed_costs_loans
 from .config import CORS_ORIGINS
 from .db import init_db
 
@@ -37,7 +37,7 @@ async def integrity_error(_: Request, exc: IntegrityError):
     return JSONResponse(status_code=422, content={"detail": "저장할 수 없는 값입니다", "error": str(exc.orig).splitlines()[0]})
 
 
-for module in (counterparties,):
+for module in (counterparties, fixed_costs_loans):
     app.include_router(module.router)
 
 

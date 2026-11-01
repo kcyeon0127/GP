@@ -6,6 +6,7 @@ import Signal from '../components/Signal.tsx'
 import WhyRisk from '../components/WhyRisk.tsx'
 import { DriversCard, LiveSignal } from '../components/live/AlertParts.tsx'
 import LiveChart from '../components/live/LiveChart.tsx'
+import LiveWhy from '../components/live/LiveWhy.tsx'
 import { useLiveData } from '../live.ts'
 import { md, useApiStatus } from '../api.ts'
 import { HORIZON, WINDOW, base, signalOf } from '../engine.ts'
@@ -68,11 +69,19 @@ function LiveHome() {
               </form>
             </div>
           </div>
-          <div className="tiles">
+          {f.signal === 'GREEN' ? (
+            <div className="tiles">
               {tile('/simulation', '이러면 어떻게 될까?', '거래처 정산이 늦어지거나 매출이 줄면 잔액이 어떻게 변하는지 미리 확인합니다.', '시나리오 해 보기 →')}
               {tile('/map', '왜 모자랄까?', '돈이 어디서 들어와 어디로 나가는지 관계망으로 보고 위험 경로를 확인합니다.', '원인 보기 →')}
               {tile('/agent', '무엇부터 할까?', '부족이 예상될 때 효과가 계산된 대응안을 순위로 받아봅니다.', '대응안 보기 →')}
-          </div>
+            </div>
+          ) : (
+            <div className="tiles risk">
+              {tile('/simulation', '이러면 어떻게 될까?', '매출이 줄거나 금리가 오르면 더 나빠지는지, 대출을 받으면 나아지는지 미리 확인합니다.', '시나리오 해 보기 →')}
+              {tile('/agent', '무엇부터 할까?', '효과가 계산된 대응안을 순위로 받아봅니다.', '대응안 보기 →')}
+              <LiveWhy f={f} />
+            </div>
+          )}
         </div>
 
         <aside className="widgets" aria-label="위젯">

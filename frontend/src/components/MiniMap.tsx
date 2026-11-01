@@ -9,6 +9,8 @@ interface Box { id: Kind; kind: Kind; x: number; y: number; w: number; h: number
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
+export type MiniStats = ReturnType<typeof summary>
+
 function summary() {
   const n = graph.nodes
   const settle = n.filter((x) => x.type === 'settlement')
@@ -51,8 +53,9 @@ function Shape({ b }: { b: Box }) {
   }
 }
 
-export default function MiniMap() {
-  const s = summary()
+/** stats를 주면 그 숫자로 그린다(서버 등록 데이터). 없으면 시연 그래프에서 합산한다. */
+export default function MiniMap({ stats }: { stats?: MiniStats }) {
+  const s = stats ?? summary()
   const boxes: Record<Kind, Box> = {
     account: { id: 'account', kind: 'account', x: 240, y: 160, w: 150, h: 62, title: '사업용 계좌', sub: `잔액 ${won(s.balance)}` },
     rev: { id: 'rev', kind: 'rev', x: 64, y: 160, w: 112, h: 72, title: `매출처 ${s.partners}곳`, sub: `정산 ${won(s.inAmt)}` },

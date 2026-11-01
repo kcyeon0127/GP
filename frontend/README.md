@@ -1,4 +1,4 @@
-# 상생여지도 프론트엔드
+# 머니메이트 프론트엔드
 
 React + TypeScript + Vite. 지금은 합성 데이터와 브라우저 안 계산 엔진(`src/engine.ts`)으로 동작하는 시연 버전이다.
 백엔드(FastAPI)가 준비되면 `src/data.ts`와 `src/engine.ts`의 계산을 API 호출로 바꾼다.

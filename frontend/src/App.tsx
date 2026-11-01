@@ -5,6 +5,7 @@ import Main from './pages/Main.tsx'
 import Simulation from './pages/Simulation.tsx'
 import SimulationAsk from './pages/SimulationAsk.tsx'
 import FinMap from './pages/FinMap.tsx'
+import MapPage from './pages/MapPage.tsx'
 import Agent from './pages/Agent.tsx'
 import Ledger from './pages/Ledger.tsx'
 
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/simulation" element={<Simulation />} />
             <Route path="/simulation/ask" element={<SimulationAsk />} />
             <Route path="/map" element={<FinMap />} />
+            <Route path="/map/mine" element={<MapPage />} />
             <Route path="/agent" element={<Agent />} />
             <Route path="/ledger" element={<Ledger />} />
           </Routes>

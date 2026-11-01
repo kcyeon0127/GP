@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import cytoscape from 'cytoscape'
 import { graph } from '../data/financeGraph.ts'
 import { groupOf, nodeSub, type Group } from '../graph/describe.ts'
-import { radialLayout, sectorsOf, SIZE, type Sector } from '../graph/layout.ts'
+import { AX, AY, RING, radialLayout, sectorsOf, SIZE, type Sector } from '../graph/layout.ts'
 import type { Status } from '../graph/propagate.ts'
 
 export interface NodeMark { status: Status; hop: number }
@@ -34,11 +34,20 @@ const shapeOf = (type: string, sector: Sector) => (AMOUNT.has(type) ? 'octagon' 
 const SMALL = new Set(['clause', 'signal'])
 const positions = radialLayout(graph)
 
+// 레이더 고리: 동심원 배치의 반지름과 같다. 가게 계좌에서 몇 단계 떨어진 연결인지 읽게 해 준다(설명은 EdgeLegend).
+const RADAR: { r: number; label: string }[] = [
+  { r: RING[1], label: '1단계 · 돈이 오가는 일정' },
+  { r: RING[2], label: '2단계 · 거래 상대' },
+  { r: RING[3], label: '3단계 · 계약·근거' },
+]
+
 export default function GraphView({ visible, showLabels, nodeMarks, edgeMarks, replayKey, selectedId, onSelect }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const cy = useRef<cytoscape.Core | null>(null)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 }) // 레이더를 지도와 같이 움직이기 위한 pan·zoom
+  const pinging = nodeMarks.size > 0
 
   useEffect(() => {
     const css = getComputedStyle(document.documentElement)
@@ -102,7 +111,10 @@ export default function GraphView({ visible, showLabels, nodeMarks, edgeMarks, r
         { selector: 'node.sel', style: { 'border-width': 4, 'border-color': v('--brand') } },
       ],
     })
+    const sync = () => { const c = cy.current!; setView({ ...c.pan(), zoom: c.zoom() }) }
+    cy.current.on('viewport', sync)
     cy.current.fit(undefined, 24)
+    sync()
     cy.current.on('mouseover', 'edge', (e) => e.target.addClass('hov'))
     cy.current.on('mouseout', 'edge', (e) => e.target.removeClass('hov'))
     cy.current.on('tap', 'node', (e) => onSelectRef.current(e.target.id()))
@@ -149,5 +161,34 @@ export default function GraphView({ visible, showLabels, nodeMarks, edgeMarks, r
     n.addClass('sel')
   }, [selectedId])
 
-  return <div ref={host} className="cy" role="img" aria-label="금융지도: 사업용 계좌를 중심으로 정산, 지급, 카드, 대출, 계약과 조항, 신호가 연결된 관계도" />
+  const cx = view.x, cyy = view.y, z = view.zoom
+  return (
+    <div className="radar-host">
+      <svg className="radar" aria-hidden>
+        <defs>
+          <radialGradient id="radar-fade">
+            <stop offset="0" stopColor="var(--brand)" stopOpacity="0.07" />
+            <stop offset="1" stopColor="var(--brand)" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <ellipse cx={cx} cy={cyy} rx={AX * RING[3] * 1.12 * z} ry={AY * RING[3] * 1.12 * z} fill="url(#radar-fade)" />
+        <line x1={cx - AX * RING[3] * 1.12 * z} x2={cx + AX * RING[3] * 1.12 * z} y1={cyy} y2={cyy} className="radar-axis" />
+        <line x1={cx} x2={cx} y1={cyy - AY * RING[3] * 1.12 * z} y2={cyy + AY * RING[3] * 1.12 * z} className="radar-axis" />
+        {RADAR.map((ring) => (
+          <g key={ring.r}>
+            <ellipse cx={cx} cy={cyy} rx={AX * ring.r * z} ry={AY * ring.r * z} className="radar-ring"><title>{ring.label}</title></ellipse>
+          </g>
+        ))}
+        {pinging && !reducedMotion() && (
+          // 시나리오를 실행하면 가게 계좌에서 바깥쪽으로 신호가 한 번 퍼진다
+          <ellipse key={replayKey} cx={cx} cy={cyy} className="radar-ping" rx={0} ry={0}>
+            <animate attributeName="rx" from="0" to={AX * RING[3] * 1.12 * z} dur="1.6s" fill="freeze" />
+            <animate attributeName="ry" from="0" to={AY * RING[3] * 1.12 * z} dur="1.6s" fill="freeze" />
+            <animate attributeName="opacity" from="0.55" to="0" dur="1.6s" fill="freeze" />
+          </ellipse>
+        )}
+      </svg>
+      <div ref={host} className="cy" role="img" aria-label="금융지도: 사업용 계좌를 중심으로 정산, 지급, 카드, 대출, 계약과 조항, 신호가 연결된 관계도. 바깥 고리로 갈수록 계좌에서 멀리 떨어진 연결이다." />
+    </div>
+  )
 }

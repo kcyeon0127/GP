@@ -19,9 +19,9 @@ const SECTOR: Record<Sector, { from: number; to: number }> = {
   top: { from: 232, to: 308 },
   bottom: { from: 132, to: 48 },
 }
-const RING = { 1: 210, 2: 390, 3: 570 }
-const AX = 1.3 // 한 화면에 맞추기 위한 타원 비율
-const AY = 0.9
+export const RING = { 1: 210, 2: 390, 3: 570 }
+export const AX = 1.3 // 한 화면에 맞추기 위한 타원 비율
+export const AY = 0.9
 
 const RING1: Record<Sector, string[]> = { left: ['S1', 'S2', 'S3'], right: ['Y1', 'Y2', 'F1', 'F2', 'F3'], top: [], bottom: ['L1', 'L2'] }
 const RING2_TOP = ['C1', 'C2']

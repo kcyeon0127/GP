@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import BalanceChart from '../components/BalanceChart.tsx'
 import MiniMap from '../components/MiniMap.tsx'
 import Signal from '../components/Signal.tsx'
 import WhyRisk from '../components/WhyRisk.tsx'
+import LiveChart from '../components/live/LiveChart.tsx'
+import { api, md, useApiStatus, type ForecastDto } from '../api.ts'
 import { HORIZON, WINDOW, base, signalOf } from '../engine.ts'
 import { alertWindowEvents, dayLabel, news, pastBalances, won } from '../data.ts'
 
@@ -12,6 +14,33 @@ const upcoming = alertWindowEvents.filter((e) => e.direction === 'out').sort((a,
 const incoming = alertWindowEvents.filter((e) => e.kind === 'settlement').sort((a, b) => a.day - b.day)
 
 export default function Main() {
+  const live = useApiStatus()
+  if (live) return <LiveHome />
+  return <DemoHome checking={live === null} />
+}
+
+function LiveHome() {
+  const [f, setF] = useState<ForecastDto | null>(null)
+  const [full, setFull] = useState(false)
+  useEffect(() => { api<ForecastDto>('/api/forecasts', { method: 'POST', body: {} }).then(setF) }, [])
+  if (!f) return <div className="page-head"><h1>오늘의 자금 현황</h1></div>
+  return (
+    <>
+      <div className="page-head"><h1>오늘의 자금 현황</h1></div>
+      <div className="card">
+              <h2>향후 {full ? '12주' : '4주'} 예상 잔액</h2>
+              {!f.has_events && <p className="empty-note">{f.message} <Link to="/ledger">일정 등록하기 →</Link></p>}
+              <LiveChart f={f} days={full ? 84 : 28} height={260} />
+              <p className="later">
+                기준일 {md(f.base_date)} · 현재 잔액 {won(f.start_balance)}
+                <button type="button" className="link-btn" aria-pressed={full} onClick={() => setFull((v) => !v)}>{full ? '4주만 보기' : '12주 전체 보기'}</button>
+              </p>
+      </div>
+    </>
+  )
+}
+
+function DemoHome({ checking }: { checking: boolean }) {
   const f = base.forecast
   const [full, setFull] = useState(false)
   const later = f.later
@@ -19,6 +48,7 @@ export default function Main() {
   return (
     <>
       <div className="page-head"><h1>오늘의 자금 현황</h1></div>
+      {!checking && <p className="banner">서버에 연결되지 않아 합성 데이터 시연 화면을 보여 드려요.</p>}
       <div className="main-grid">
         <div className="stack">
           <Signal {...sig} />

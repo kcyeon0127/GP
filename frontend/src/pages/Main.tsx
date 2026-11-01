@@ -29,6 +29,12 @@ function LiveHome() {
       <div className="page-head"><h1>오늘의 자금 현황</h1></div>
       <div className="card">
               <h2>향후 {full ? '12주' : '4주'} 예상 잔액</h2>
+              <p className="sub">
+                {f.first_shortage_date
+                  ? <>최초 부족일 <b className="num bad">{md(f.first_shortage_date)}</b> · 부족액 <b className="num bad">{won(f.shortage_amount!)}</b>. </>
+                  : <><b>부족 예상 없음</b>. </>}
+                최저 잔액은 <b className="num">{won(f.min_balance)}</b> ({md(f.min_balance_date)})예요.
+              </p>
               {!f.has_events && <p className="empty-note">{f.message} <Link to="/ledger">일정 등록하기 →</Link></p>}
               <LiveChart f={f} days={full ? 84 : 28} height={260} />
               <p className="later">

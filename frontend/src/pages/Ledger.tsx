@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import LiveLedger from '../components/LiveLedger.tsx'
+import { useApiStatus } from '../api.ts'
 import { business, monthlyEvents, dayLabel, partners, won, type EventKind } from '../data.ts'
 
 // 내 거래·일정: 지금은 합성 데이터를 읽기 전용으로 보여 준다.
@@ -9,6 +11,16 @@ const ROLE = { sales: '매출처', purchase: '매입처' } as const
 const monthly = [...monthlyEvents].sort((a, b) => a.day - b.day)
 
 export default function Ledger() {
+  const live = useApiStatus()
+  if (live) {
+    return (
+      <>
+        <div className="page-head"><Link to="/" className="back">← 홈</Link><h1>내 거래·일정</h1></div>
+        <p className="muted" style={{ marginBottom: 16 }}>저장하면 앞으로 12주 예정일이 만들어지고, 홈의 예상 잔액에 반영돼요.</p>
+        <LiveLedger />
+      </>
+    )
+  }
   return (
     <>
       <div className="page-head">

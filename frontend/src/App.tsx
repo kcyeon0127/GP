@@ -15,7 +15,7 @@ export default function App() {
       <div className="shell">
         <aside className="rail">
           <div>
-            <div className="logo">상생여지도<small>소상공인 유동성 관리</small>{isRisk && <span className="demo-badge">위험 상황 데모</span>}</div>
+            <div className="logo">머니메이트<small>사장님 대신 돈 흐름을 챙기는 AI 자금 비서</small>{isRisk && <span className="demo-badge">위험 상황 데모</span>}</div>
             <nav className="nav" aria-label="주요 메뉴">
               <NavLink to="/" end className={({ isActive }) => (isActive ? 'on' : '')}>홈</NavLink>
               <NavLink to="/map" className={({ isActive }) => (isActive ? 'on' : '')}>원인 보기</NavLink>

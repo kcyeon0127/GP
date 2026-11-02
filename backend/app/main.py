@@ -1,4 +1,4 @@
-"""상생여지도 백엔드 (FastAPI). 실행: uvicorn app.main:app --reload"""
+"""머니메이트 백엔드 (FastAPI). 실행: uvicorn app.main:app --reload"""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -18,7 +18,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="상생여지도 API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="머니메이트 API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 

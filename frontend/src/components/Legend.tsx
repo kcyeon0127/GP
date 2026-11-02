@@ -32,6 +32,8 @@ export function EdgeLegend() {
       <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="var(--muted)" strokeWidth="2" strokeDasharray="1.5 3" strokeLinecap="round" /></svg>조건·규칙</span>
       <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="#3b82c4" strokeWidth="1" strokeDasharray="1.5 3" strokeLinecap="round" /></svg>신호</span>
       <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="var(--red)" strokeWidth="3" /></svg>위험 경로</span>
+      <span className="sep" aria-hidden />
+      <span className="k"><svg width="20" height="12" aria-hidden><circle cx="10" cy="6" r="2" fill="var(--brand)" /><circle cx="10" cy="6" r="5.5" fill="none" stroke="var(--brand)" strokeOpacity=".5" strokeDasharray="2 2" /></svg>고리: 안쪽부터 돈이 오가는 일정 → 거래 상대 → 계약·근거</span>
     </div>
   )
 }

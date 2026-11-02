@@ -1,17 +1,24 @@
 """요청·응답 DTO (Pydantic). 입력 검증은 여기서, 업무 판단은 서비스에서 한다."""
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from .domain.enums import PayCycle, RateType
 
 Money = Field(gt=0, description="원 단위, 0보다 커야 한다")
 PayDay = Field(ge=1, le=31, description="월 결제일(1~31). 주간이면 요일(1=월 … 7=일)")
+# 앞뒤 공백을 지운 뒤 1자 이상 (공백만 넣은 이름은 빈 칸으로 본다)
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+def _optional_name(v: str | None) -> str | None:
+    v = (v or "").strip()
+    return v or None
 
 
 class CounterpartyIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: Name
     trade_type: Literal["SALES", "PURCHASE"]
     pay_cycle: PayCycle
     pay_day: int = PayDay
@@ -33,12 +40,26 @@ class CounterpartyOut(CounterpartyIn):
 
 
 class FixedCostIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: Name
     pay_cycle: Literal["MONTHLY", "QUARTERLY"]
     pay_day: int = PayDay
     months: str | None = Field(default=None, description="분기 고정비 지급 월, 예: 3,6,9,12")
     amount: int = Money
-    payee: str | None = Field(default=None, description="임대인 등 지급 상대. 있으면 임대(LEASE) 계약으로 금융지도에 연결")
+    payee: str | None = Field(default=None, max_length=100, description="임대인 등 지급 상대. 있으면 임대(LEASE) 계약으로 금융지도에 연결")
+
+    _payee = field_validator("payee")(_optional_name)
+
+    @model_validator(mode="after")
+    def check_months(self):
+        """분기 지급 월은 1~12 숫자를 쉼표로 구분한다. 매월이면 지급 월은 쓰지 않는다."""
+        if self.pay_cycle == "MONTHLY" or not (self.months or "").strip():
+            self.months = None
+            return self
+        parts = [x.strip() for x in self.months.split(",") if x.strip()]
+        if not all(x.isdigit() and 1 <= int(x) <= 12 for x in parts):
+            raise ValueError("지급 월은 1~12 숫자를 쉼표로 적으세요 (예: 3,6,9,12)")
+        self.months = ",".join(str(m) for m in sorted({int(x) for x in parts}))
+        return self
 
 
 class FixedCostOut(FixedCostIn):
@@ -47,8 +68,8 @@ class FixedCostOut(FixedCostIn):
 
 
 class LoanIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    lender: str = Field(min_length=1, max_length=100)
+    name: Name
+    lender: Name
     principal: int = Field(ge=0)
     interest_rate: float = Field(ge=0, le=30)
     rate_type: RateType = RateType.FIXED

@@ -27,3 +27,19 @@ def test_counterparty_update_and_delete(client):
     assert r.json()["next_due_dates"] == ["2026-11-30", "2026-12-31"]  # 31일 → 11/30 말일 보정
     assert client.delete(f"/api/counterparties/{cid}").status_code == 204
     assert client.get("/api/counterparties").json() == []
+
+
+def test_blank_name_rejected(client):
+    r = client.post("/api/counterparties", json={"name": "   ", "trade_type": "SALES", "pay_cycle": "MONTHLY", "pay_day": 1, "amount": 100})
+    assert r.status_code == 422 and r.json()["fields"] == ["name"]
+
+
+def test_weekly_day_out_of_range_points_at_pay_day(client):
+    r = client.post("/api/counterparties", json={"name": "주간상회", "trade_type": "SALES", "pay_cycle": "WEEKLY", "pay_day": 8, "amount": 100})
+    assert r.status_code == 422 and r.json()["fields"] == ["pay_day"]
+
+
+def test_name_used_by_payee_gets_clear_message(client):
+    client.post("/api/fixed-costs", json={"name": "임대료", "pay_cycle": "MONTHLY", "pay_day": 10, "amount": 1_500_000, "payee": "건물주"})
+    r = client.post("/api/counterparties", json={"name": "건물주", "trade_type": "SALES", "pay_cycle": "MONTHLY", "pay_day": 1, "amount": 100})
+    assert r.status_code == 409 and "받는 곳" in r.json()["detail"]

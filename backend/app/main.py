@@ -25,7 +25,11 @@ app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*
 @app.exception_handler(RequestValidationError)
 async def validation_error(_: Request, exc: RequestValidationError):
     """빠진 칸·잘못된 칸 이름을 fields로 돌려준다 (US-01 AC-02, US-02 AC-03)."""
-    fields = sorted({str(e["loc"][-1]) for e in exc.errors() if len(e["loc"]) > 1})
+    fields = sorted({str(e["loc"][-1]) for e in exc.errors() if len(e["loc"]) > 1 and e["loc"][-1] != "body"})
+    if any("지급 월" in e["msg"] for e in exc.errors()):
+        fields.append("months")
+    if any("요일 번호" in e["msg"] for e in exc.errors()):
+        fields.append("pay_day")
     errors = [{"field": str(e["loc"][-1]), "msg": e["msg"]} for e in exc.errors()]
     return JSONResponse(status_code=422, content={"detail": "필수 항목을 확인하세요", "fields": fields, "errors": errors})
 

@@ -11,15 +11,16 @@ export default function CounterpartySection({ items, reload }: { items: Counterp
     { name: 'pay_cycle', label: '결제 주기', type: 'select', options: CYCLE },
     { name: 'pay_day', label: '결제일', type: 'number', placeholder: '1~31 (매주는 요일 1~7)' },
     { name: 'amount', label: '금액(원)', type: 'number' },
-  ], (b) => api('/api/counterparties', { method: 'POST', body: b }), reload)
+  ], (b, id) => api(id === null ? '/api/counterparties' : `/api/counterparties/${id}`, { method: id === null ? 'POST' : 'PUT', body: b }), reload)
   return (
     <section className="card">
       <h2>거래처·결제 조건 <span className="count">{items.length}</span></h2>
       <form onSubmit={f.onSubmit}>{f.render}</form>
       {items.map((c) => (
-        <div className="row" key={c.counterparty_id}>
+        <div className={`row ${f.editing === c.counterparty_id ? 'editing' : ''}`} key={c.counterparty_id}>
           <span>{c.name} <span className="muted">· {c.trade_type === 'SALES' ? '매출처' : '매입처'}</span><br /><span className="muted">예정일 {dates(c.next_due_dates)}</span></span>
           <span className="actions"><b className={`num ${c.trade_type === 'PURCHASE' ? 'bad' : ''}`}>{c.trade_type === 'PURCHASE' ? '-' : '+'}{won(c.amount)}</b>
+            <button className="x-btn" onClick={() => f.startEdit(c.counterparty_id, { ...c })}>수정</button>
             <button className="x-btn" onClick={() => del(c.counterparty_id)}>삭제</button></span>
         </div>
       ))}

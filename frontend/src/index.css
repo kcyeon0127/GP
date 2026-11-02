@@ -346,3 +346,5 @@ input[type='range'] { accent-color: var(--brand); }
 .radar-ring { fill: none; stroke: var(--brand); stroke-opacity: .22; stroke-width: 1.2; stroke-dasharray: 3 5; }
 .radar-axis { stroke: var(--brand); stroke-opacity: .08; stroke-width: 1; }
 .radar-ping { fill: none; stroke: var(--red); stroke-width: 2; }
+
+.row.editing { background: var(--brand-bg); border-radius: 8px; padding-left: 8px; padding-right: 8px; }

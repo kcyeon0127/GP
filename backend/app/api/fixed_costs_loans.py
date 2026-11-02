@@ -36,6 +36,32 @@ def _payee_contract(s: Session, b: Business, payee: str | None, ctype: ContractT
     return c.contract_id
 
 
+def _drop_payee_contract(s: Session, contract_id: int | None) -> None:
+    """고정비·대출에 딸린 계약을 지우고, 다른 계약이 없는 상대 거래처도 지운다 (금융지도에 빈 노드가 남지 않게)."""
+    if not contract_id:
+        return
+    c = s.get(Contract, contract_id)
+    if c is None:
+        return
+    cp = c.counterparty
+    s.delete(c)
+    s.flush()
+    if not s.scalar(select(Contract.contract_id).where(Contract.counterparty_id == cp.counterparty_id)):
+        s.delete(cp)
+        s.flush()
+
+
+def _sync_payee(s: Session, b: Business, contract_id: int | None, payee: str | None, ctype: ContractType, role: CounterpartyRole,
+                cycle: PayCycle, day: int, amount: int) -> int | None:
+    """수정 때 받는 곳·금융기관이 바뀌면 계약을 새로 잇고, 같으면 계약의 금액·날짜만 맞춘다."""
+    current = s.get(Contract, contract_id) if contract_id else None
+    if current is not None and payee == current.counterparty.name:
+        current.pay_cycle, current.pay_day, current.amount = cycle, day, amount
+        return current.contract_id
+    _drop_payee_contract(s, contract_id)
+    return _payee_contract(s, b, payee, ctype, role, cycle, day, amount)
+
+
 @router.get("/fixed-costs", response_model=list[FixedCostOut])
 def list_fixed_costs(s: Session = Depends(get_session), b: Business = Depends(business)):
     return [_fc_out(s, f) for f in s.scalars(select(FixedCost).where(FixedCost.business_id == b.business_id).order_by(FixedCost.fixed_cost_id))]
@@ -59,6 +85,7 @@ def update_fixed_cost(fixed_cost_id: int, body: FixedCostIn, s: Session = Depend
     if not f or f.business_id != b.business_id:
         raise HTTPException(404, detail="고정비가 없습니다")
     f.name, f.pay_cycle, f.pay_day, f.months, f.amount = body.name, PayCycle(body.pay_cycle), body.pay_day, body.months, body.amount
+    f.contract_id = _sync_payee(s, b, f.contract_id, body.payee, ContractType.LEASE, CounterpartyRole.SUPPLIER, f.pay_cycle, f.pay_day, f.amount)
     s.flush()
     schedule_service.for_fixed_cost(s, b, f)
     s.commit()
@@ -71,7 +98,10 @@ def delete_fixed_cost(fixed_cost_id: int, s: Session = Depends(get_session), b: 
     if not f or f.business_id != b.business_id:
         raise HTTPException(404, detail="고정비가 없습니다")
     schedule_service.remove(s, b, CashSource.FIXED_COST, f.fixed_cost_id)
+    contract_id = f.contract_id
     s.delete(f)
+    s.flush()
+    _drop_payee_contract(s, contract_id)
     s.commit()
 
 
@@ -104,6 +134,7 @@ def update_loan(loan_id: int, body: LoanIn, s: Session = Depends(get_session), b
         raise HTTPException(404, detail="대출이 없습니다")
     for k, v in body.model_dump().items():
         setattr(l, k, v)
+    l.contract_id = _sync_payee(s, b, l.contract_id, body.lender, ContractType.LOAN, CounterpartyRole.LENDER, PayCycle.MONTHLY, l.repay_day, l.installment)
     s.flush()
     schedule_service.for_loan(s, b, l)
     s.commit()
@@ -116,5 +147,8 @@ def delete_loan(loan_id: int, s: Session = Depends(get_session), b: Business = D
     if not l or l.business_id != b.business_id:
         raise HTTPException(404, detail="대출이 없습니다")
     schedule_service.remove(s, b, CashSource.LOAN, l.loan_id)
+    contract_id = l.contract_id
     s.delete(l)
+    s.flush()
+    _drop_payee_contract(s, contract_id)
     s.commit()

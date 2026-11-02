@@ -15,10 +15,11 @@ router = APIRouter(prefix="/api")
 
 
 def _dup(s: Session, b: Business, name: str, exclude: int | None = None) -> None:
-    q = select(Counterparty.counterparty_id).where(Counterparty.business_id == b.business_id, Counterparty.name == name)
-    found = s.scalar(q)
-    if found and found != exclude:
-        raise HTTPException(409, detail="이미 등록된 거래처 이름입니다")
+    found = s.scalar(select(Counterparty).where(Counterparty.business_id == b.business_id, Counterparty.name == name))
+    if found and found.counterparty_id != exclude:
+        trade = any(c.contract_type in (ContractType.SALES, ContractType.PURCHASE) for c in found.contracts)
+        # 고정비 받는 곳·대출 금융기관은 거래처 목록에 안 보이므로 왜 막히는지 따로 알려 준다
+        raise HTTPException(409, detail="이미 등록된 거래처 이름입니다" if trade else "고정비 받는 곳이나 대출 금융기관으로 이미 쓰는 이름입니다. 다른 이름을 쓰세요")
 
 
 def _cp_out(s: Session, cp: Counterparty) -> CounterpartyOut:

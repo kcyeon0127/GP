@@ -14,7 +14,8 @@
     "cytoscape": "^3.34.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "recharts": "^2.15.4"
   },
   "devDependencies": {
     "@types/cytoscape": "^3.21.9",

@@ -6,6 +6,8 @@ import Signal from '../components/Signal.tsx'
 import { applyShocks, base, compare, forecast, signalOf, type Shock } from '../engine.ts'
 import { dayLabel, partners, won } from '../data.ts'
 import { isRisk } from '../demo.ts'
+import LiveSimulation from '../components/live/LiveSimulation.tsx'
+import { useApiStatus } from '../api.ts'
 
 type Kind = 'settlement_delay' | 'revenue_drop' | 'rate_up' | 'partner_closure'
 const KINDS: { id: Kind; label: string }[] = [
@@ -18,6 +20,12 @@ const sales = partners.filter((p) => p.role === 'sales')
 
 // What-if 홈: 충격 조건을 직접 조절하는 화면. 오른쪽 아래 챗봇에 말로 물으면 /simulation/ask 로 이어진다.
 export default function Simulation() {
+  const live = useApiStatus()
+  if (live) return <LiveSimulation />
+  return <DemoSimulation />
+}
+
+function DemoSimulation() {
   const [kind, setKind] = useState<Kind>(isRisk ? 'revenue_drop' : 'settlement_delay')
   const [partnerId, setPartnerId] = useState('P1')
   const [days, setDays] = useState(14)

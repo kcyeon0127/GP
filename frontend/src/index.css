@@ -348,3 +348,14 @@ input[type='range'] { accent-color: var(--brand); }
 .radar-ping { fill: none; stroke: var(--red); stroke-width: 2; }
 
 .row.editing { background: var(--brand-bg); border-radius: 8px; padding-left: 8px; padding-right: 8px; }
+
+/* 입력 편의 (내 거래·일정) */
+.preset-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; font-size: 13px; }
+.chip { border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.chip:hover { border-color: var(--brand); }
+.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.day-input { display: flex; gap: 6px; align-items: center; }
+.day-input input { flex: 1; min-width: 0; }
+.form-grid .hint { color: var(--brand); font-weight: 600; }
+.impact { position: sticky; top: 8px; z-index: 2; margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--green-bg); color: var(--green); font-size: 14px; font-weight: 600; }
+.impact.worse { background: var(--red-bg); color: var(--red); }

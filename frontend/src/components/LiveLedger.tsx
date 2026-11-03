@@ -5,6 +5,7 @@ import { api, md, type CounterpartyDto, type ForecastDto } from '../api.ts'
 import { won } from '../data.ts'
 import CounterpartySection from './ledger/CounterpartySection.tsx'
 import FixedLoanSections from './ledger/FixedLoanSections.tsx'
+import ImportSection from './ledger/ImportSection.tsx'
 
 const SIGNAL_KO = { RED: '위험', YELLOW: '주의', GREEN: '안전' } as const
 
@@ -18,6 +19,7 @@ function impact(prev: ForecastDto, next: ForecastDto): string {
 export default function LiveLedger() {
   const [cps, setCps] = useState<CounterpartyDto[]>([])
   const [note, setNote] = useState<{ text: string; worse: boolean } | null>(null)
+  const [ver, setVer] = useState(0) // 파일로 여러 건 등록하면 고정비·대출 목록을 다시 불러온다
   const last = useRef<ForecastDto | null>(null)
   const forecast = () => api<ForecastDto>('/api/forecasts', { method: 'POST', body: {} })
   const onSaved = () => forecast().then((f) => {
@@ -30,8 +32,9 @@ export default function LiveLedger() {
   return (
     <div className="stack">
       {note && <p className={`impact ${note.worse ? 'worse' : ''}`} role="status">{note.text}</p>}
+      <ImportSection onSaved={() => { reloadCps(); setVer((v) => v + 1) }} />
       <CounterpartySection items={cps} reload={reloadCps} />
-      <FixedLoanSections onSaved={onSaved} />
+      <FixedLoanSections key={ver} onSaved={onSaved} />
     </div>
   )
 }

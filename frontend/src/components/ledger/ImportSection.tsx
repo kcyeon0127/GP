@@ -37,6 +37,7 @@ function bodyOf(r: Row): [string, Record<string, unknown>] {
     return ['/api/fixed-costs', { name: r.name, pay_cycle: r.pay_cycle, pay_day: r.pay_day, amount: r.amount, months: r.months }]
   }
   // 대출 잔액·금리는 거래내역에 없어서 0으로 두고, 목록에서 수정해 채운다
+  // (예상 잔액은 월 상환액만 쓰므로 0이어도 계산은 맞다. 고정금리로 두어 금리 시나리오에도 걸리지 않는다.)
   return ['/api/loans', { name: r.name, lender: r.name.split(' ')[0], principal: 0, interest_rate: 0, rate_type: 'FIXED', installment: r.amount, repay_day: r.pay_day }]
 }
 
@@ -62,13 +63,14 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
     try {
       const d = await api<ImportDto>('/api/imports/transactions', { method: 'POST', body: { text: await readText(file) } })
       setData(d)
-      setRows(d.candidates.map((c) => ({ ...c, on: !c.already })))
+      setRows(d.candidates.map((c) => ({ ...c, on: !c.already }))) // 이미 등록된 이름은 꺼 둔다: 눌러도 409로 막히거나 고정비가 두 번 잡힌다
     } catch (ex) { setErr((ex as ApiError).message) }
   }
   const register = async () => {
     setBusy(true)
     const done: string[] = []
     const skipped: string[] = []
+    // 한 건씩 보낸다: 이름이 겹친 한 건이 막혀도 나머지는 등록하고, 무엇을 건너뛰었는지 알려 주기 위해서다.
     for (const r of rows.filter((x) => x.on)) {
       const [path, body] = bodyOf(r)
       try { await api(path, { method: 'POST', body }); done.push(r.name) } catch (ex) { skipped.push(`${r.name}(${(ex as ApiError).message})`) }

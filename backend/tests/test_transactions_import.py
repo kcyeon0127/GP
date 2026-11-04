@@ -67,6 +67,28 @@ def test_import_api_marks_registered(client):
     assert already["한빛식자재"] is True and already["새봄마트"] is False
 
 
+def test_same_schedule_finds_other_name():
+    c = tx.Candidate(name="국민은행 대출원리금", direction="OUT", kind="LOAN", pay_cycle="MONTHLY", pay_day=15, amount=2_400_000, count=3)
+    loan = tx.Registered("운영자금대출", "OUT", "MONTHLY", 15, 2_400_000)
+    assert tx.same_schedule(c, [loan]) == "운영자금대출"
+    assert tx.same_schedule(c, [tx.Registered("다른날", "OUT", "MONTHLY", 16, 2_400_000)]) is None
+    assert tx.same_schedule(c, [tx.Registered("다른금액", "OUT", "MONTHLY", 15, 3_000_000)]) is None
+    assert tx.same_schedule(c, [tx.Registered("받는돈", "IN", "MONTHLY", 15, 2_400_000)]) is None
+
+
+def test_import_api_same_loan_other_name(client):
+    client.post("/api/loans", json={"name": "운영자금대출", "lender": "○○은행", "principal": 60_000_000, "interest_rate": 5.1,
+                                    "rate_type": "FIXED", "installment": 2_400_000, "repay_day": 15}).raise_for_status()
+    body = client.post("/api/imports/transactions", json={"text": SAMPLE.read_text(encoding="utf-8-sig")}).json()
+    loan = next(c for c in body["candidates"] if c["name"] == "국민은행 대출원리금")
+    assert loan["already"] is True and loan["same_as"] == "운영자금대출"
+
+
+def test_import_api_broken_file_is_not_server_error(client):
+    r = client.post("/api/imports/transactions", json={"text": '"' + "a" * 200_000})
+    assert r.status_code == 422 and "CSV" in r.json()["detail"]
+
+
 def test_import_api_bad_file(client):
     r = client.post("/api/imports/transactions", json={"text": "hello"})
     assert r.status_code == 422 and "거래일" in r.json()["detail"]

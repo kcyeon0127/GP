@@ -88,6 +88,15 @@ def _date(v: str) -> date | None:
         return None
 
 
+def _newest_first(txns: list[Txn]) -> bool:
+    """은행마다 최신순·오래된순이 다르다. 순서를 맞춰야 마지막 거래 후 잔액을 현재 잔액으로 쓸 수 있다."""
+    if txns[0].day != txns[-1].day:
+        return txns[0].day > txns[-1].day
+    # 하루치 파일은 날짜로 알 수 없어, 잔액이 어느 방향으로 이어지는지 본다
+    pairs = [(a, b) for a, b in zip(txns, txns[1:]) if a.balance is not None and b.balance is not None]
+    return sum(b.balance + a.amount == a.balance for a, b in pairs) > sum(a.balance + b.amount == b.balance for a, b in pairs)
+
+
 def parse_csv(text: str) -> list[Txn]:
     rows = list(csv.reader(io.StringIO(text.lstrip("﻿"))))
     for i, row in enumerate(rows):
@@ -111,7 +120,9 @@ def parse_csv(text: str) -> list[Txn]:
         txns.append(Txn(day=day, desc=row[desc].strip(), amount=amount, balance=_money(row[bal]) if bal is not None and row[bal].strip() else None))
     if not txns:
         raise CsvFormatError("읽을 수 있는 거래가 없어요. 날짜와 금액 칸을 확인해 주세요.")
-    return sorted(txns, key=lambda t: t.day)
+    if _newest_first(txns):
+        txns.reverse()
+    return sorted(txns, key=lambda t: t.day)  # 안정 정렬: 같은 날 거래는 일어난 순서를 유지한다
 
 
 def _name_key(desc: str) -> str:
@@ -183,10 +194,7 @@ def detect(txns: list[Txn]) -> list[Candidate]:
 
 
 def last_balance(txns: list[Txn]) -> tuple[date, int] | None:
-    """파일 마지막 거래 후 잔액. 현재 잔액을 맞출 때 쓴다.
-
-    주의: 같은 날 거래끼리는 파일 순서를 그대로 두므로, 최신 거래가 위에 있는 파일이면 그날 첫 거래의 잔액이 나온다.
-    """
+    """파일 마지막 거래 후 잔액. 현재 잔액을 맞출 때 쓴다."""
     for t in reversed(txns):
         if t.balance is not None:
             return t.day, t.balance

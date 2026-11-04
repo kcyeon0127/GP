@@ -22,6 +22,18 @@ def test_parse_signed_amount_column():
     assert [t.amount for t in txns] == [-1_500_000, -1_500_000]
 
 
+HEADER = "거래일자,내용,출금액,입금액,거래후잔액\n"
+SAME_DAY = ["2026-10-31,첫거래,100000,,900000\n", "2026-10-31,중간,,50000,950000\n", "2026-10-31,마지막,200000,,750000\n"]
+TWO_DAYS = ["2026-10-30,전날,100000,,900000\n", *SAME_DAY[1:]]
+
+
+@pytest.mark.parametrize("rows, balance", [(SAME_DAY, 750_000), (TWO_DAYS, 750_000)])
+def test_last_balance_same_in_either_file_order(rows, balance):
+    """최신 거래가 위에 있는 은행 파일에서도 그날 마지막 거래의 잔액을 쓴다."""
+    for ordered in (rows, rows[::-1]):
+        assert tx.last_balance(tx.parse_csv(HEADER + "".join(ordered))) == (date(2026, 10, 31), balance)
+
+
 def test_parse_rejects_unknown_format():
     with pytest.raises(tx.CsvFormatError):
         tx.parse_csv("a,b,c\n1,2,3\n")

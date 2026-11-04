@@ -12,6 +12,8 @@ from .deps import business
 router = APIRouter(prefix="/api")
 
 
+# 파일 업로드(multipart)가 아니라 텍스트로 받는다: python-multipart 의존성을 늘리지 않고,
+# 은행 파일의 EUC-KR은 브라우저 TextDecoder로 풀 수 있기 때문이다.
 class ImportIn(BaseModel):
     text: str = Field(min_length=1, max_length=5_000_000, description="CSV 파일 내용 (화면에서 UTF-8/EUC-KR을 풀어 보낸다)")
 

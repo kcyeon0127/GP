@@ -13,6 +13,8 @@ from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import date
 
+# 앞에 있는 별칭을 먼저 쓴다. desc에서 기재내용이 적요보다 앞인 이유: 적요에는 은행에 따라
+# '타행이체'·'자동이체' 같은 거래 방식만 적혀 있어, 이걸로 묶으면 다른 거래처가 한 일정으로 합쳐진다.
 ALIASES = {
     "date": ["거래일시", "거래일자", "거래일", "거래날짜", "일자", "날짜", "거래시간"],
     "desc": ["기재내용", "거래내용", "내용", "받는분/보낸분", "보낸분/받는분", "의뢰인/수취인", "거래처", "적요", "메모"],
@@ -21,9 +23,10 @@ ALIASES = {
     "amount": ["거래금액", "금액"],
     "balance": ["거래후잔액", "잔액", "잔고"],
 }
+# 종류는 이름으로 추정할 뿐이다. 'kt'처럼 짧은 낱말은 다른 이름에 걸릴 수 있어, 화면에서 사장님이 바꿀 수 있게 했다.
 LOAN_WORDS = ("대출", "원리금", "이자", "상환")
 FIXED_WORDS = ("임대", "월세", "관리비", "급여", "월급", "인건비", "전기", "가스", "수도", "통신", "kt", "skt", "lg유플러스", "보험", "카드", "세금", "부가세", "납부", "국민연금", "건강보험")
-MIN_COUNT = 2
+MIN_COUNT = 2  # 1회는 반복인지 알 수 없다. 2회까지 받는 이유: 6개월치 파일에서 분기 일정은 2번만 나온다.
 AMOUNT_TOLERANCE = 0.2  # 중앙값에서 ±20% 안이면 같은 일정으로 본다
 DAY_SPREAD = 5  # 매월 일정의 날짜가 이 안에서 흔들리면 같은 일정 (주말·공휴일 밀림)
 
@@ -124,6 +127,7 @@ def _kind(name: str, direction: str, cycle: str) -> str:
     low = name.lower()
     if any(w in low for w in LOAN_WORDS) and cycle == "MONTHLY":
         return "LOAN"
+    # 매주 나가는 돈이 매입처가 되는 이유: 고정비는 매월·분기만 등록할 수 있다 (FixedCostIn).
     if any(w in low for w in FIXED_WORDS) and cycle != "WEEKLY":
         return "FIXED_COST"
     return "PURCHASE"
@@ -143,17 +147,18 @@ def detect(txns: list[Txn]) -> list[Candidate]:
     for (name, direction), ts in groups.items():
         if len(ts) < MIN_COUNT:
             continue
-        amounts = [abs(t.amount) for t in ts]
+        amounts = [abs(t.amount) for t in ts]  # 평균이 아니라 중앙값: 한 번 튄 금액에 끌려가지 않게
         mid = int(statistics.median(amounts))
         if any(abs(a - mid) > mid * AMOUNT_TOLERANCE for a in amounts):
             continue  # 매일 들어오는 카드매출처럼 금액이 들쭉날쭉하면 정기 일정이 아니다
         days = [t.day for t in ts]
         gaps = [(b - a).days for a, b in zip(days, days[1:])]
         gap = statistics.median(gaps)
-        if 6 <= gap <= 8 and len(ts) >= 3:
+        # 간격도 중앙값으로 본다: 한 달을 건너뛰거나 하루 더 들어온 거래가 있어도 주기를 놓치지 않게
+        if 6 <= gap <= 8 and len(ts) >= 3:  # 2회로는 우연히 일주일 간격인 거래와 구분되지 않는다
             weekday = statistics.mode(d.isoweekday() for d in days)
             cycle, pay_day, months = "WEEKLY", weekday, None
-        elif 25 <= gap <= 35 and len({(d.year, d.month) for d in days}) == len(days):
+        elif 25 <= gap <= 35 and len({(d.year, d.month) for d in days}) == len(days):  # 한 달에 두 번 나오면 매월 일정이 아니다
             if all(_is_month_end(d) for d in days):
                 pay_day = 31  # 말일 (30일까지 있는 달은 말일로 맞춰진다)
             elif max(d.day for d in days) - min(d.day for d in days) <= DAY_SPREAD:
@@ -178,7 +183,10 @@ def detect(txns: list[Txn]) -> list[Candidate]:
 
 
 def last_balance(txns: list[Txn]) -> tuple[date, int] | None:
-    """파일 마지막 거래 후 잔액. 현재 잔액을 맞출 때 쓴다."""
+    """파일 마지막 거래 후 잔액. 현재 잔액을 맞출 때 쓴다.
+
+    주의: 같은 날 거래끼리는 파일 순서를 그대로 두므로, 최신 거래가 위에 있는 파일이면 그날 첫 거래의 잔액이 나온다.
+    """
     for t in reversed(txns):
         if t.balance is not None:
             return t.day, t.balance

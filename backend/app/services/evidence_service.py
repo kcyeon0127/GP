@@ -50,6 +50,8 @@ def collect(s: Session, r: ForecastRun) -> dict:
             contract_events.setdefault(p["contract_id"], []).append(e)
     # 경로에 나온 계약마다 그 계약서에서 가장 관련 있는 조항 1개 (유사도가 기준 이상일 때만)
     # 임베딩 서버에 닿지 않으면 경로 근거만 돌려주고 문서 근거가 빠졌다고 알린다.
+    # 왜: 경로 근거는 Neo4j만으로 만들 수 있어 lab 터널 하나 때문에 패널 전체가 죽을 이유가 없다.
+    # 500으로 두면 CORS 헤더 없이 나가서 화면에는 "Failed to fetch"만 보인다.
     docs_down = False
     for cid, evs in contract_events.items():
         query = f"{evs[0].label} 지급 지연 연체 시 조항"
@@ -57,7 +59,7 @@ def collect(s: Session, r: ForecastRun) -> dict:
             vec = embedding_client.embed([query])[0]
         except httpx.HTTPError:
             docs_down = True
-            break
+            break  # 계약마다 같은 서버를 부르므로 나머지도 실패한다. 타임아웃을 반복해 기다리지 않는다.
         for chunk, doc, score in document_repository.search(s, r.business_id, vec, limit=1, contract_ids=[cid]):
             if score >= EVIDENCE_MIN_SCORE:
                 items.append(dict(ref_type=EvidenceRef.DOCUMENT_CHUNK, ref_id=chunk.key, text=f"{doc.title} {chunk.text}", score=round(score, 3)))

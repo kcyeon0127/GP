@@ -51,8 +51,10 @@ def apply(items: list[Item], c: Conditions) -> list[Item]:
                 new = replace(new, due_date=new.due_date + timedelta(days=c.delay_days))
             if c.revenue_drop_pct:
                 new = replace(new, amount=round(new.amount * (1 - c.revenue_drop_pct / 100)))
+        # 고정비는 올리지 않는다: 임대료·인건비는 원가 상승과 바로 연동되지 않고, AC-05도 매입 지급만 본다.
         elif it.kind == "PURCHASE" and c.cost_rise_pct:
             new = replace(new, amount=round(new.amount * (1 + c.cost_rise_pct / 100)))
+        # 잔액 × %p ÷ 12로 단순화한다: 만기는 선택 입력이라 원리금을 다시 계산할 수 없고, 12주 안에서는 잔액 변화가 작다.
         elif it.kind == "LOAN" and it.variable_principal and c.rate_rise_pp:
             new = replace(new, amount=new.amount - round(it.variable_principal * c.rate_rise_pp / 100 / 12))
         out.append(new)

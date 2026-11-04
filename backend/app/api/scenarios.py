@@ -13,6 +13,7 @@ from .deps import business
 router = APIRouter(prefix="/api")
 
 
+# 상한(60일·90%·100%·10%p)은 AC에 없는 값으로, 오타를 막으려고 정했다. AC-07이 요구하는 것은 0 거부다.
 class SettlementDelay(BaseModel):
     counterparty_id: int
     days: int = Field(ge=1, le=60, description="지연 일수 1~60일")
@@ -38,7 +39,7 @@ class ScenarioIn(BaseModel):
 
 @router.post("/scenarios", status_code=201)
 def create_scenario(body: ScenarioIn, s: Session = Depends(get_session), b: Business = Depends(business)):
-    if body.settlement_delay:
+    if body.settlement_delay:  # 매입처를 고르면 아무 일정도 안 바뀐 채 "변화 없음"으로 보이므로 미리 막는다
         cp = s.get(Counterparty, body.settlement_delay.counterparty_id)
         if not cp or cp.business_id != b.business_id or not any(c.contract_type == ContractType.SALES for c in cp.contracts):
             raise HTTPException(422, detail="정산을 미룰 매출처를 고르세요")

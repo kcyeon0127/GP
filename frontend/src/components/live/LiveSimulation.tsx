@@ -44,6 +44,9 @@ function CompareChart({ r }: { r: ScenarioDto }) {
 
 const day = (d: string | null) => (d ? md(d) : '없음')
 
+// 기존 데모처럼 조건을 바꿀 때마다 계산하지 않고 버튼을 둔다: 실행마다 시나리오가 DB에 저장되기 때문이다.
+// 슬라이더 대신 숫자 칸을 쓰는 이유: 0처럼 범위 밖 값도 넣을 수 있어야 범위 안내(AC-07)가 동작한다.
+// 처음 켜 둔 조건은 AC-01과 같다 (정산 15일 지연 + 원가 10% 상승).
 export default function LiveSimulation() {
   const [sales, setSales] = useState<CounterpartyDto[]>([])
   const [on, setOn] = useState({ delay: true, revenue: false, cost: true, rate: false })

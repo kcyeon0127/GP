@@ -46,12 +46,18 @@ def _in_horizon(b: Business, d: date) -> bool:
 
 
 def compare(s: Session, b: Business, cond: sc.Conditions) -> dict:
+    """기준안도 지금 일정으로 새로 계산한다: 저장된 최근 실행은 일정을 고친 뒤라 오래됐을 수 있어, 같은 일정끼리 비교되게 한다.
+
+    GET comparison도 이 함수를 쓰므로 일정이 바뀌면 저장된 forecast_run과 값이 달라질 수 있다.
+    "_forecast"는 run()이 저장에 쓰는 내부 값이라 응답 전에 뺀다.
+    """
     items = items_of(s, b)
     after = sc.apply(items, cond)
     base_f = cashflow_engine.forecast(b.base_date, b.current_balance, b.safety_balance, [(i.due_date, i.amount) for i in items])
     scen_f = cashflow_engine.forecast(b.base_date, b.current_balance, b.safety_balance, [(i.due_date, i.amount) for i in after])
     base_bal, scen_bal = dict(base_f.daily), dict(scen_f.daily)
     # AC-02: 기준안에서는 낼 수 있었는데 시나리오에서는 그날 잔액이 0원 아래가 되는 지급
+    # 기준안에서도 모자랐던 지급은 뺀다: 이 조건 때문에 새로 생긴 위험만 보여 주는 목록이다.
     new_short = [dict(event_id=a.event_id, date=a.due_date, label=a.label, amount=-a.amount, balance=scen_bal[a.due_date])
                  for a in after if a.amount < 0 and _in_horizon(b, a.due_date) and scen_bal[a.due_date] < 0 <= base_bal[a.due_date]]
     changes = [dict(event_id=a.event_id, label=a.label, before_date=i.due_date, after_date=a.due_date if _in_horizon(b, a.due_date) else None,

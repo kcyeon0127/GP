@@ -14,7 +14,7 @@ export default function LiveWhy({ f }: { f: ForecastDto }) {
     .catch(() => setEv({ items: [], message: '근거를 불러오지 못했어요. 서버 연결을 확인한 뒤 다시 눌러 주세요.' }))
   return (
     <section className="why card" aria-labelledby="why-h">
-      <div className="row-head"><h2 id="why-h">왜 자금 상태가 “{level}”일까요?</h2>{(!ev || !ev.items.length) && <button className="btn" onClick={show}>{ev ? '다시 보기' : '이유 보기'}</button>}</div>
+      <div className="row-head"><h2 id="why-h">왜 자금 상태가 “{level}”일까요?</h2>{(!ev || !ev.items.length || ev.message) && <button className="btn" onClick={show}>{ev ? '다시 보기' : '이유 보기'}</button>}</div>
       <p className="sub">{signalReason(f)} {f.shortage_amount ? `부족액 ${won(f.shortage_amount)}.` : ''}</p>
       {ev && (ev.items.length ? (
         <>

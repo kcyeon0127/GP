@@ -28,6 +28,7 @@ LOAN_WORDS = ("대출", "원리금", "이자", "상환")
 FIXED_WORDS = ("임대", "월세", "관리비", "급여", "월급", "인건비", "전기", "가스", "수도", "통신", "kt", "skt", "lg유플러스", "보험", "카드", "세금", "부가세", "납부", "국민연금", "건강보험")
 MIN_COUNT = 2  # 1회는 반복인지 알 수 없다. 2회까지 받는 이유: 6개월치 파일에서 분기 일정은 2번만 나온다.
 AMOUNT_TOLERANCE = 0.2  # 중앙값에서 ±20% 안이면 같은 일정으로 본다
+SAME_AMOUNT = 0.05  # 등록된 일정과 금액이 ±5% 안이면 같은 일정으로 본다
 DAY_SPREAD = 5  # 매월 일정의 날짜가 이 안에서 흔들리면 같은 일정 (주말·공휴일 밀림)
 
 
@@ -98,7 +99,10 @@ def _newest_first(txns: list[Txn]) -> bool:
 
 
 def parse_csv(text: str) -> list[Txn]:
-    rows = list(csv.reader(io.StringIO(text.lstrip("﻿"))))
+    try:
+        rows = list(csv.reader(io.StringIO(text.lstrip("\ufeff"))))
+    except csv.Error as e:  # 엑셀 파일을 그대로 올리면 이렇게 깨진다
+        raise CsvFormatError("CSV로 읽을 수 없는 파일이에요. 엑셀 파일이면 CSV로 저장해서 올려 주세요.") from e
     for i, row in enumerate(rows):
         headers = [_norm_header(c) for c in row]
         d, desc = _find(headers, "date"), _find(headers, "desc")
@@ -191,6 +195,29 @@ def detect(txns: list[Txn]) -> list[Candidate]:
         out.append(Candidate(name=name, direction=direction, kind=kind, pay_cycle=cycle, pay_day=pay_day, amount=mid, count=len(ts),
                              dates=days, varies=len(set(amounts)) > 1, months=months))
     return sorted(out, key=lambda c: (c.direction != "IN", -c.amount))
+
+
+@dataclass(frozen=True)
+class Registered:
+    name: str
+    direction: str
+    pay_cycle: str
+    pay_day: int
+    amount: int
+
+
+def same_schedule(c: Candidate, registered: list[Registered]) -> str | None:
+    """이미 등록된 일정이면 그 이름을 돌려준다.
+
+    이름만 보면 안 된다: 통장에는 '국민은행 대출원리금', 등록은 '운영자금대출'처럼 달라서 같은 돈이 두 번 잡힌다.
+    """
+    for r in registered:
+        if r.name == c.name:
+            return r.name
+    for r in registered:
+        if (r.direction, r.pay_cycle, r.pay_day) == (c.direction, c.pay_cycle, c.pay_day) and abs(r.amount - c.amount) <= r.amount * SAME_AMOUNT:
+            return r.name
+    return None
 
 
 def last_balance(txns: list[Txn]) -> tuple[date, int] | None:

@@ -7,12 +7,13 @@ import { won } from '../../data.ts'
 type Kind = 'SALES' | 'PURCHASE' | 'FIXED_COST' | 'LOAN'
 interface CandidateDto {
   name: string; direction: 'IN' | 'OUT'; kind: Kind; pay_cycle: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'; pay_day: number; amount: number
-  months: string | null; count: number; dates: string[]; varies: boolean; already: boolean
+  months: string | null; count: number; dates: string[]; varies: boolean; already: boolean; same_as: string | null
 }
 interface ImportDto { rows: number; period: [string, string]; last_balance: { date: string; balance: number } | null; candidates: CandidateDto[] }
-interface Row extends CandidateDto { on: boolean }
+interface Row extends CandidateDto { on: boolean; id: string }
 
 const KIND_KO: Record<Kind, string> = { SALES: '매출처(받을 돈)', PURCHASE: '매입처(줄 돈)', FIXED_COST: '고정비', LOAN: '대출 상환' }
+const MAX_FILE = 5_000_000 // 서버 제한(ImportIn.text)과 같다
 const WEEKDAY = ['', '월', '화', '수', '목', '금', '토', '일']
 
 /** 주기·방향에 따라 등록할 수 있는 종류 (고정비는 매월·분기만, 분기는 고정비만) */
@@ -60,10 +61,11 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
     e.target.value = ''
     if (!file) return
     setMsg(''); setErr(''); setData(null); setRows([])
+    if (file.size > MAX_FILE) { setErr('파일이 너무 커요. 5MB 이하로 기간을 줄여 다시 받아 주세요.'); return }
     try {
       const d = await api<ImportDto>('/api/imports/transactions', { method: 'POST', body: { text: await readText(file) } })
       setData(d)
-      setRows(d.candidates.map((c) => ({ ...c, on: !c.already }))) // 이미 등록된 이름은 꺼 둔다: 눌러도 409로 막히거나 고정비가 두 번 잡힌다
+      setRows(d.candidates.map((c) => ({ ...c, on: !c.already, id: `${c.name}-${c.direction}` }))) // 이미 등록된 이름은 꺼 둔다: 눌러도 409로 막히거나 고정비가 두 번 잡힌다
     } catch (ex) { setErr((ex as ApiError).message) }
   }
   const register = async () => {
@@ -106,7 +108,7 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
           {rows.length === 0 && <p className="muted">반복되는 입출금을 찾지 못했어요. 2달 이상 기간으로 다시 받아 보세요.</p>}
           <ul className="cands">
             {rows.map((r, i) => (
-              <li key={`${r.name}-${r.direction}`} className={r.on ? 'on' : ''}>
+              <li key={r.id} className={r.on ? 'on' : ''}>
                 <input type="checkbox" checked={r.on} aria-label={`${r.name} 등록`} onChange={(e) => set(i, { on: e.target.checked })} />
                 <input className="cand-name" value={r.name} aria-label="이름" onChange={(e) => set(i, { name: e.target.value })} />
                 <select value={r.kind} aria-label="종류" onChange={(e) => set(i, { kind: e.target.value as Kind })} disabled={kindsFor(r).length === 1}>
@@ -114,7 +116,7 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
                 </select>
                 <span className="muted">{when(r)} · {r.count}회</span>
                 <b className={`num ${r.direction === 'OUT' ? 'bad' : ''}`}>{r.varies ? '약 ' : ''}{r.direction === 'OUT' ? '-' : '+'}{won(r.amount)}</b>
-                {r.already && <span className="pill soon">이미 등록됨</span>}
+                {r.already && <span className="pill soon">{r.same_as && r.same_as !== r.name ? `등록된 '${r.same_as}'와 같은 일정` : '이미 등록됨'}</span>}
               </li>
             ))}
           </ul>

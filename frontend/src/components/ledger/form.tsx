@@ -28,7 +28,14 @@ export function useForm(fields: Field[], submit: (body: Record<string, unknown>,
   const [bad, setBad] = useState<string[]>([])
   const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState<number | null>(null)
-  const set = (name: string, v: string) => setValues((cur) => ({ ...cur, [name]: v }))
+  const set = (name: string, v: string) => setValues((cur) => {
+    const next = { ...cur, [name]: v }
+    // 매주와 다른 주기를 오가면 날짜 칸을 비운다: 매월 5일의 5가 그대로 금요일이 되는 일을 막는다
+    for (const f of fields) {
+      if (f.cycleField === name && (cur[name] === 'WEEKLY') !== (v === 'WEEKLY')) next[f.name] = ''
+    }
+    return next
+  })
   const reset = () => { setValues(blank); setBad([]); setMsg(''); setEditing(null) }
   const startEdit = (id: number, item: Record<string, unknown>) => {
     setValues(Object.fromEntries(fields.map((f) => [f.name, item[f.name] == null ? '' : String(item[f.name])])))

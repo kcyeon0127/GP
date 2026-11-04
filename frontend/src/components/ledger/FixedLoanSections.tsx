@@ -5,6 +5,8 @@ import { won } from '../../data.ts'
 import { dates, useForm, type Preset } from './form.tsx'
 
 // 자주 쓰는 고정비: 누르면 이름·주기(·받는 곳)가 채워지고 날짜·금액만 넣으면 된다
+// 날짜·금액은 일부러 채우지 않는다: 가게마다 달라서, 틀린 기본값이 그대로 저장되면 예상 잔액이 조용히 틀어진다.
+// 부가세만 예외다: 납부 기한(1·4·7·10월 25일)이 가게와 상관없이 정해져 있다.
 const FC_PRESETS: Preset[] = [
   { label: '임대료', values: { name: '임대료', pay_cycle: 'MONTHLY', payee: '건물주' } },
   { label: '인건비', values: { name: '인건비', pay_cycle: 'MONTHLY', payee: '직원' } },

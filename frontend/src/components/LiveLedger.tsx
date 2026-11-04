@@ -18,12 +18,12 @@ function impact(prev: ForecastDto, next: ForecastDto): string {
 export default function LiveLedger() {
   const [cps, setCps] = useState<CounterpartyDto[]>([])
   const [note, setNote] = useState<{ text: string; worse: boolean } | null>(null)
-  const last = useRef<ForecastDto | null>(null)
+  const last = useRef<ForecastDto | null>(null) // 비교 기준일 뿐 화면에 그리지 않으므로 state가 아니라 ref
   const forecast = () => api<ForecastDto>('/api/forecasts', { method: 'POST', body: {} })
   const onSaved = () => forecast().then((f) => {
     if (last.current) setNote({ text: impact(last.current, f), worse: f.min_balance < last.current.min_balance })
     last.current = f
-  }).catch(() => setNote(null))
+  }).catch(() => setNote(null)) // 저장은 이미 끝났다. 재계산만 실패한 것을 저장 실패처럼 보이지 않게 문구만 지운다.
   const load = () => { api<CounterpartyDto[]>('/api/counterparties').then(setCps) }
   const reloadCps = () => { load(); onSaved() }
   useEffect(() => { load(); forecast().then((f) => { last.current = f }).catch(() => {}) }, [])

@@ -8,6 +8,7 @@ import { signalReason } from '../../live.ts'
 export default function LiveWhy({ f }: { f: ForecastDto }) {
   const [ev, setEv] = useState<{ items: EvidenceDto[]; message: string | null } | null>(null)
   const level = f.signal === 'RED' ? '위험' : '주의'
+  // 실패해도 버튼을 남긴다: 서버가 돌아오면 새로고침 없이 다시 누를 수 있게. 브라우저 오류 원문은 사장님에게 뜻이 없어 안내 문구로 바꾼다.
   const show = () => api<{ evidence: EvidenceDto[]; message: string | null }>(`/api/alerts/${f.run_id}/evidence`)
     .then((r) => setEv({ items: r.evidence, message: r.message }))
     .catch(() => setEv({ items: [], message: '근거를 불러오지 못했어요. 서버 연결을 확인한 뒤 다시 눌러 주세요.' }))

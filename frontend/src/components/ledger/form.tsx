@@ -18,6 +18,7 @@ const WEEKDAYS: [string, string][] = [['', '요일 선택'], ['1', '월요일'],
 const LAST_DAY = '31' // 31일은 30일까지 있는 달에 말일로 맞춰진다 (US-01 AC-03)
 const FIELD_KO: Record<string, string> = { name: '이름', trade_type: '거래 유형', pay_cycle: '결제 주기', pay_day: '결제일', amount: '금액', lender: '금융기관', installment: '월 상환액', repay_day: '상환일', principal: '대출 잔액', interest_rate: '금리', months: '지급 월(1~12, 쉼표)', payee: '받는 곳' }
 
+// 금액 칸은 값을 숫자만으로 들고 콤마는 표시할 때만 붙인다. type="number"는 콤마를 넣을 수 없어 text로 둔다.
 const digits = (v: string) => v.replace(/[^\d]/g, '')
 const comma = (v: string) => (v ? Number(v).toLocaleString('ko-KR') : '')
 
@@ -33,6 +34,7 @@ export function useForm(fields: Field[], submit: (body: Record<string, unknown>,
     setValues(Object.fromEntries(fields.map((f) => [f.name, item[f.name] == null ? '' : String(item[f.name])])))
     setBad([]); setMsg(''); setEditing(id)
   }
+  // blank에서 시작한다: 쓰던 값이나 앞서 누른 버튼의 값(부가세의 지급 월 등)이 다음 항목에 섞여 저장되지 않게.
   const applyPreset = (p: Preset) => { setValues({ ...blank, ...p.values }); setBad([]); setMsg(''); setEditing(null) }
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -66,7 +68,7 @@ export function useForm(fields: Field[], submit: (body: Record<string, unknown>,
       return <select className={cls} value={v} onChange={(e) => set(f.name, e.target.value)}>{WEEKDAYS.map(([o, l]) => <option key={o} value={o}>{l}</option>)}</select>
     }
     if (f.type === 'day') {
-      const last = v === LAST_DAY
+      const last = v === LAST_DAY // 말일이면 숫자 칸을 비운다: "31일"로 보이면 2월·4월에는 어떻게 되는지 헷갈린다
       return (
         <span className="day-input">
           <input className={cls} type="number" inputMode="numeric" min={1} max={31} placeholder={f.placeholder ?? '1~31'} value={last ? '' : v} aria-invalid={bad.includes(f.name)}
@@ -80,6 +82,7 @@ export function useForm(fields: Field[], submit: (body: Record<string, unknown>,
   }
   const render = (presets: Preset[] = []) => (
     <>
+      {/* 수정 중에는 숨긴다: 누르면 수정 모드가 풀려 새 항목으로 저장되기 때문이다 */}
       {presets.length > 0 && editing === null && (
         <div className="preset-row" aria-label="자주 쓰는 항목">
           <span className="muted">자주 쓰는 항목</span>

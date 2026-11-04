@@ -116,7 +116,7 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
                 </select>
                 <span className="muted">{when(r)} · {r.count}회</span>
                 <b className={`num ${r.direction === 'OUT' ? 'bad' : ''}`}>{r.varies ? '약 ' : ''}{r.direction === 'OUT' ? '-' : '+'}{won(r.amount)}</b>
-                {r.already && <span className="pill soon">{r.same_as && r.same_as !== r.name ? `등록된 '${r.same_as}'와 같은 일정` : '이미 등록됨'}</span>}
+                {r.already && <span className="pill soon">{r.same_as && r.same_as !== r.name ? `같은 일정 있음: ${r.same_as}` : '이미 등록됨'}</span>}
               </li>
             ))}
           </ul>

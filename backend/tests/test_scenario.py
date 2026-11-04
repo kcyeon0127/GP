@@ -82,5 +82,6 @@ def test_api_range_ac07(client):
     cid = _cp_id(client, "청춘마켓")
     r = client.post("/api/scenarios", json={"settlement_delay": {"counterparty_id": cid, "days": 0}})
     assert r.status_code == 422 and "days" in r.json()["fields"]
-    assert client.post("/api/scenarios", json={}).status_code == 422
+    empty = client.post("/api/scenarios", json={})
+    assert empty.status_code == 422 and empty.json()["detail"] == "조건을 하나 이상 고르세요"
     assert client.post("/api/scenarios", json={"revenue_drop_pct": 0}).status_code == 422

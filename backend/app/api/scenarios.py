@@ -1,6 +1,6 @@
 """US-09: What-if 시나리오 실행과 기준안 비교."""
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..db import get_session
@@ -25,12 +25,6 @@ class ScenarioIn(BaseModel):
     cost_rise_pct: float | None = Field(default=None, gt=0, le=100, description="원가 상승률(%) 0 초과 100 이하")
     rate_rise_pp: float | None = Field(default=None, gt=0, le=10, description="변동금리 상승폭(%p) 0 초과 10 이하")
 
-    @model_validator(mode="after")
-    def at_least_one(self):
-        if not (self.settlement_delay or self.revenue_drop_pct or self.cost_rise_pct or self.rate_rise_pp):
-            raise ValueError("조건을 하나 이상 고르세요")
-        return self
-
     def conditions(self) -> sc.Conditions:
         d = self.settlement_delay
         return sc.Conditions(delay_counterparty_id=d.counterparty_id if d else None, delay_days=d.days if d else 0,
@@ -39,6 +33,9 @@ class ScenarioIn(BaseModel):
 
 @router.post("/scenarios", status_code=201)
 def create_scenario(body: ScenarioIn, s: Session = Depends(get_session), b: Business = Depends(business)):
+    # 값 범위와 달리 빠진 칸이 없는 오류라 공통 검증 처리기로 보내면 "필수 항목을 확인하세요"로 뭉개진다
+    if not (body.settlement_delay or body.revenue_drop_pct or body.cost_rise_pct or body.rate_rise_pp):
+        raise HTTPException(422, detail="조건을 하나 이상 고르세요")
     if body.settlement_delay:  # 매입처를 고르면 아무 일정도 안 바뀐 채 "변화 없음"으로 보이므로 미리 막는다
         cp = s.get(Counterparty, body.settlement_delay.counterparty_id)
         if not cp or cp.business_id != b.business_id or not any(c.contract_type == ContractType.SALES for c in cp.contracts):

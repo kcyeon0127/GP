@@ -33,7 +33,9 @@ export function useForm(fields: Field[], submit: (body: Record<string, unknown>,
     } catch (err) {
       const ae = err as ApiError
       setBad(ae.fields ?? [])
-      setMsg(ae.fields?.length ? `${ae.fields.map((x) => FIELD_KO[x] ?? x).join(', ')}을(를) 확인하세요.${ae.fields.includes('amount') ? ' 금액은 0보다 커야 해요.' : ''}` : ae.message)
+      // 안내 문구는 이 폼의 칸 이름을 그대로 쓴다 (고정비는 '지급일', 거래처는 '결제일')
+      const label = (x: string) => fields.find((f) => f.name === x)?.label ?? FIELD_KO[x] ?? x
+      setMsg(ae.fields?.length ? `빨간 칸을 확인해 주세요: ${ae.fields.map(label).join(', ')}.${ae.fields.includes('amount') ? ' 금액은 0보다 커야 해요.' : ''}` : ae.message)
     }
   }
   const render = (

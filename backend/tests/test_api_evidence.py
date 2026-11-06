@@ -4,7 +4,8 @@ import pytest
 from tests.helpers import register_sample
 
 from app.config import EMBEDDING_API_KEY, EMBEDDING_URL
-from app.repositories import graph_repository
+from app.repositories import embedding_client, graph_repository
+from app.services.evidence_service import DOCS_DOWN
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -37,3 +38,19 @@ def test_evidence_none_when_green(client):
     r = client.post("/api/forecasts", json={"current_balance": 50_000_000}).json()
     assert r["signal"] == "GREEN"
     assert client.get(f"/api/alerts/{r['run_id']}/evidence").json() == {"run_id": r["run_id"], "evidence": [], "message": "근거 없음"}
+
+
+def test_evidence_paths_when_embedding_down(client, monkeypatch):
+    """임베딩 서버가 꺼져 있어도 500 대신 경로 근거(P)와 안내 문구를 돌려준다."""
+    def down(_texts):
+        raise httpx.ConnectError("embedding down")
+    monkeypatch.setattr(embedding_client, "embed", down)
+    if not client.get("/api/counterparties").json():  # 앞 테스트가 건너뛰어졌으면 여기서 등록
+        register_sample(client)
+    client.post("/api/graph/sync")
+    run_id = client.post("/api/forecasts", json={"base_date": "2026-11-01", "current_balance": 1_000_000}).json()["run_id"]
+    res = client.get(f"/api/alerts/{run_id}/evidence")
+    assert res.status_code == 200
+    ev = res.json()
+    assert ev["evidence"] and all(e["type"] == "GRAPH_PATH" for e in ev["evidence"])
+    assert ev["message"] == DOCS_DOWN

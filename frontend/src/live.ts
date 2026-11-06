@@ -17,7 +17,9 @@ export function useLiveData() {
       api<CounterpartyDto[]>('/api/counterparties'),
       api<FixedCostDto[]>('/api/fixed-costs'),
       api<LoanDto[]>('/api/loans'),
-    ]).then(([f, cps, fcs, loans]) => {
+      // 건수 표시만을 위한 호출이라 실패해도 홈 전체를 막지 않는다
+      api<{ chunks: number }>('/api/documents/summary').catch(() => ({ chunks: 0 })),
+    ]).then(([f, cps, fcs, loans, docs]) => {
       const events: LiveEvent[] = [
         ...cps.flatMap((c) => c.next_due_dates.map((d) => ({ key: `c${c.counterparty_id}-${d}`, label: `${c.name} ${c.trade_type === 'SALES' ? '정산' : '매입 대금'}`, date: d, amount: c.amount, dir: c.trade_type === 'SALES' ? 'IN' as const : 'OUT' as const }))),
         ...fcs.flatMap((x) => x.next_due_dates.map((d) => ({ key: `f${x.fixed_cost_id}-${d}`, label: x.name, date: d, amount: x.amount, dir: 'OUT' as const }))),
@@ -28,7 +30,7 @@ export function useLiveData() {
       const stats: MiniStats = {
         balance: f.start_balance, partners: sales.length, inAmt: sales.reduce((a, c) => a + c.amount, 0),
         outCount: outs.length, outAmt: outs.reduce((a, b) => a + b, 0), loans: loans.length, loanAmt: loans.reduce((a, l) => a + l.installment, 0),
-        cards: 0, contracts: cps.length + fcs.filter((x) => x.payee).length + loans.length, clauses: 0,
+        cards: fcs.filter((x) => x.name.includes('카드')).length, contracts: cps.length + fcs.filter((x) => x.payee).length + loans.length, clauses: docs.chunks,
       }
       setData({ f, events, stats })
     }).catch((e) => setErr(e.message))

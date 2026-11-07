@@ -369,3 +369,14 @@ input[type='range'] { accent-color: var(--brand); }
 .ok-msg { margin: 10px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--green-bg); color: var(--green); font-size: 14px; font-weight: 600; }
 @media (max-width: 720px) { .cands li { grid-template-columns: auto 1fr; } .cands li > :nth-child(n+3) { grid-column: 2; } }
 .import-pick .link-btn { margin-left: 0; }
+
+/* What-if 조건 (서버 모드) */
+.cond { border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.cond.on { border-color: var(--brand); }
+.cond-head { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.cond-body { display: grid; gap: 8px; margin-top: 8px; font-size: 14px; }
+.cond-body select, .cond-body input { border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.cond-body .inline { display: flex; align-items: center; gap: 6px; }
+.cond-body .inline input { width: 80px; }
+details.card summary { cursor: pointer; font-weight: 600; }
+.kpis.compare .kpi b { font-size: 16px; white-space: nowrap; }

@@ -54,3 +54,23 @@ def test_evidence_paths_when_embedding_down(client, monkeypatch):
     ev = res.json()
     assert ev["evidence"] and all(e["type"] == "GRAPH_PATH" for e in ev["evidence"])
     assert ev["message"] == DOCS_DOWN
+
+
+def test_evidence_covers_schedule_edited_after_last_sync(client, monkeypatch):
+    """결제일을 고치면 예정 입출금 ID가 바뀌므로, 수동 동기화 없이도 고친 거래처의 경로가 근거에 나와야 한다 (시연 대본 3~5장면)."""
+    def down(_texts):
+        raise httpx.ConnectError("embedding down")
+    monkeypatch.setattr(embedding_client, "embed", down)
+    if not client.get("/api/counterparties").json():
+        register_sample(client)
+    client.post("/api/graph/sync")
+    hanbit = next(c for c in client.get("/api/counterparties").json() if c["name"] == "한빛식자재")
+    body = {k: hanbit[k] for k in ("name", "trade_type", "pay_cycle", "amount")} | {"pay_day": 27}
+    client.put(f"/api/counterparties/{hanbit['counterparty_id']}", json=body).raise_for_status()
+    run_id = client.post("/api/forecasts", json={"base_date": "2026-11-01", "current_balance": 1_000_000}).json()["run_id"]
+    texts = [e["text"] for e in client.get(f"/api/alerts/{run_id}/evidence").json()["evidence"]]
+    assert any("11/27 한빛식자재 정산" in t for t in texts)
+
+
+def test_documents_summary_counts_only_this_business(client):
+    assert client.get("/api/documents/summary").json() == {"documents": 0, "chunks": 0}

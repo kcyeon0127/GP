@@ -20,16 +20,17 @@ ssh -N -L 8101:127.0.0.1:8101 lab &                     # 연구실 서버 bge-m
 cd backend
 python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
 echo "EMBEDDING_API_KEY=<lab 서버 /root/sangsaeng/api_key>" > .env
-.venv/bin/python -m scripts.seed_demo                  # 시연 사업장·계약 문서 적재, 그래프 동기화
+.venv/bin/python -m scripts.seed_demo                  # 시연 사업장·계약 문서 적재, 그래프 동기화 (--base-date YYYY-MM-DD로 기준일 고정)
 .venv/bin/uvicorn app.main:app --reload --port 8000     # API 문서: http://localhost:8000/docs
-.venv/bin/pytest -q                                     # 계산 정답 20건 포함 59건
+docker compose exec postgres createdb -U gp gp_test    # 테스트 DB (처음 한 번)
+.venv/bin/pytest -q                                     # 계산 정답 20건 포함
 .venv/bin/python -m scripts.eval_recall                # US-07 근거 재현율 (목표 80%)
 
 cd ../frontend
 npm ci && npm run dev                                   # http://localhost:5173
 ```
 
-백엔드에 닿지 않으면 프론트는 합성 데이터 시연 화면으로 돌아간다.
+백엔드에 닿지 않으면 프론트는 합성 데이터 시연 화면으로 돌아간다. 5분 시연 대본과 실행 체크리스트는 [docs/demo.md](docs/demo.md).
 
 ## 연구실 서버 (lab)
 

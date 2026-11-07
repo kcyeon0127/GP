@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 
 from ..config import EVIDENCE_MIN_SCORE
 from ..domain.enums import EvidenceRef
-from ..models import Evidence, ForecastRun
+from ..models import Business, Evidence, ForecastRun
 from ..repositories import document_repository, embedding_client
 from ..repositories import graph_repository as g
-from . import forecast_service
+from . import forecast_service, graph_service
 
 PATH_CYPHER = """
 MATCH (src)-[:GENERATES]->(e:CashEvent) WHERE e.cash_event_id IN $ids
@@ -34,6 +34,11 @@ def collect(s: Session, r: ForecastRun) -> dict:
     if not drv:
         return {"run_id": r.run_id, "evidence": [], "message": "근거 없음"}
     by_id = {e.cash_event_id: (e, role) for e, role in drv}
+    # 결제일을 고치면 예정 입출금이 새 ID로 다시 만들어져 Neo4j에 없다. 그대로 찾으면 고친 거래처의 경로·문서 근거만 빠지므로
+    # 그래프를 먼저 맞춘다. 근거를 볼 때만 동기화하면 저장마다 Neo4j를 부르지 않아도 된다.
+    synced = {row["id"] for row in g.query("MATCH (e:CashEvent) WHERE e.cash_event_id IN $ids RETURN e.cash_event_id AS id", ids=list(by_id))}
+    if synced != set(by_id):
+        graph_service.sync(s, s.get(Business, r.business_id))
     items: list[dict] = []
     contract_events: dict[int, list] = {}
     for p in g.query(PATH_CYPHER, ids=list(by_id)):

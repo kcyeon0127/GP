@@ -22,7 +22,7 @@ from app.domain.constants import ALERT_DAYS
 from app.domain.enums import PayCycle
 from app.domain.schedule import due_dates, parse_months
 from app.main import app
-from app.models import CashEvent, Contract, Counterparty, Document, DocumentChunk, FixedCost, Loan
+from app.models import CashEvent, Contract, Counterparty, Document, DocumentChunk, FixedCost, Loan, ResponsePlan
 from app.repositories import embedding_client
 from app.repositories.business import get_or_create
 
@@ -104,7 +104,8 @@ def resolve_base_date(requested: date | None, today: date | None = None) -> date
 
 
 def reset(s, bid):
-    for model in (CashEvent, Document, FixedCost, Loan, Counterparty):
+    # 승인한 대응안이 남아 있으면 새로 만든 일정에 다시 적용되므로 함께 지운다
+    for model in (ResponsePlan, CashEvent, Document, FixedCost, Loan, Counterparty):
         s.execute(delete(model).where(model.business_id == bid))
     s.commit()
 

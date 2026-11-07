@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { applyShocks, forecast, signalOf, type Shock } from '../engine.ts'
 import { dayLabel, won } from '../data.ts'
 import { isRisk } from '../demo.ts'
+import { useApiStatus } from '../api.ts'
+import LiveAgent from '../components/live/LiveAgent.tsx'
 
 // 위기 시나리오: 한빛식자재 정산 14일 지연. 대응안의 효과는 모두 엔진이 계산한다(M10).
 const CRISIS: Shock = { type: 'settlement_delay', partnerId: 'P1', days: 14 }
@@ -19,7 +21,14 @@ const PLANS: Plan[] = [
 interface Msg { who: 'user' | 'bot'; text: string }
 const CHIPS = isRisk ? ['지금 자금 상황이 어때?', '부족하면 뭘 해야 해?', '정책대출을 받으면 해소될까?'] : ['다음 달 자금 괜찮을까?', '한빛식자재 정산이 2주 밀리면?', '부족하면 뭘 해야 해?']
 
+// 서버에 닿으면 실제 일정으로 대응안을 계산하는 화면(US-10)을, 아니면 합성 데이터 시연 화면을 보여 준다.
 export default function Agent() {
+  const live = useApiStatus()
+  if (live) return <LiveAgent />
+  return <DemoAgent />
+}
+
+function DemoAgent() {
   const analysis = useMemo(() => {
     const crisisState = applyShocks(isRisk ? [] : [CRISIS]) // 위험 데모는 기준선이 이미 위기 상황이다
     const crisis = forecast(crisisState)

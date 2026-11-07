@@ -1,13 +1,13 @@
 """PostgreSQL 테이블 (양식 6 §3.1 ERD). 원본 데이터는 모두 여기 있고 Neo4j는 파생 저장소다."""
-from datetime import date
+from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, CheckConstraint, Date, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .config import EMBEDDING_DIM
 from .db import Base
-from .domain.enums import CashDirection, CashSource, ContractType, CounterpartyRole, EvidenceRef, PayCycle, RateType, SignalLevel
+from .domain.enums import CashDirection, CashSource, ContractType, CounterpartyRole, EvidenceRef, PayCycle, PlanStatus, RateType, SignalLevel
 
 
 def pg_enum(e, name):
@@ -154,3 +154,28 @@ class Evidence(Base):
     ref_id: Mapped[str] = mapped_column(String(40))
     rank: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
+
+
+class ResponsePlan(Base):
+    """US-10 대응안. 예정 입출금 하나(출처·원래 날짜로 찾는다)를 parts의 날짜·금액으로 나눠 내는 안이다.
+
+    출처·원래 날짜로 저장하는 이유: 예정 입출금은 일정을 고치거나 기준일이 바뀔 때마다 새 ID로 다시 만들어진다.
+    승인한 안은 ScheduleService가 다시 만들 때마다 적용하므로 재생성 뒤에도 유지된다.
+    """
+    __tablename__ = "response_plan"
+    plan_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("business.business_id", ondelete="CASCADE"))
+    run_id: Mapped[int] = mapped_column(ForeignKey("forecast_run.run_id", ondelete="CASCADE"))  # 후보를 만든 기준 계산
+    kind: Mapped[str] = mapped_column(String(30))  # PAY_DATE_SHIFT / PURCHASE_SPLIT / EXPENSE_SHIFT / LOAN_CHECK
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text)
+    caution: Mapped[str] = mapped_column(Text)
+    source_type: Mapped[CashSource] = mapped_column(pg_enum(CashSource, "cash_source"))
+    source_id: Mapped[int] = mapped_column(BigInteger)
+    original_date: Mapped[date] = mapped_column(Date)
+    original_amount: Mapped[int] = mapped_column(BigInteger)
+    parts: Mapped[str] = mapped_column(Text)  # JSON [{"due_date": "YYYY-MM-DD", "amount": 원}]
+    result: Mapped[str] = mapped_column(Text)  # JSON 재계산 요약 (신호·최초 부족일·최저 잔액·일별 잔액)
+    evidence_ids: Mapped[str] = mapped_column(Text)  # JSON ["P1", "D2"] — 같은 run의 evidence 행
+    status: Mapped[PlanStatus] = mapped_column(pg_enum(PlanStatus, "plan_status"), default=PlanStatus.PROPOSED)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime)

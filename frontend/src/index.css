@@ -388,3 +388,5 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .table td.num { text-align: right; }
 .pill.green { background: var(--green-bg); color: var(--green); }
 .plan { cursor: pointer; }
+.hold-list { margin: 4px 0 0 18px; line-height: 1.7; }
+.withheld { margin-bottom: 12px; }

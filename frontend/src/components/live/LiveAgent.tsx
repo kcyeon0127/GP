@@ -1,4 +1,4 @@
-// 대응안 비교·승인 (US-10) 서버 모드. 후보와 효과(최저 잔액·부족일)는 모두 백엔드(ResponseService)가 계산한다.
+// 대응안 비교·승인 (US-10)과 근거 부족 시 판단 보류 (US-11) 서버 모드. 후보와 효과(최저 잔액·부족일)는 모두 백엔드(ResponseService)가 계산한다.
 // 화면은 숫자를 만들지 않고, 승인 전에는 아무 일정도 바꾸지 않는다 (AC-03).
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -15,7 +15,12 @@ interface PlanDto {
   target: { date: string; amount: number }; parts: { due_date: string; amount: number }[]
   result: Result; status: string; evidence: { id: string; text: string | null }[]; evidence_missing: boolean
 }
-interface ProposalDto { run_id: number; base: Result; plans: PlanDto[]; evidence: { id: string; type: string; text: string }[]; message: string | null }
+interface WithheldDto { kind: string; kind_ko: string; title: string; missing: string }
+interface HoldDto { code: 'NO_INFLOW' | 'NO_EVIDENCE'; message: string; missing: string[] }
+interface ProposalDto {
+  run_id: number; base: Result; plans: PlanDto[]; withheld: WithheldDto[]; hold: HoldDto | null
+  evidence: { id: string; type: string; text: string }[]; message: string | null
+}
 
 const SIGNAL_KO: Record<SignalLevel, string> = { RED: '위험', YELLOW: '주의', GREEN: '안전' }
 const day = (d: string | null) => (d ? md(d) : '없음')
@@ -96,6 +101,18 @@ export default function LiveAgent() {
               <p className="sub">경보일까지 나가는 돈 중 하나를 골라 언제 낼지 바꿔 보고, 효과를 계산 모듈로 다시 계산해 비교해요. 승인하기 전에는 일정이 바뀌지 않아요.</p>
               <button className="btn" onClick={request} disabled={busy}>{busy ? '계산하는 중…' : '대응안 찾기'}</button>
             </div>
+          ) : p.hold ? (
+            // 판단 보류: 수치를 보여 주지 않고 무엇을 등록하면 되는지만 안내한다 (US-11 AC-01·04)
+            <div className="card" role="status">
+              <h2>판단을 보류했어요</h2>
+              <p className="sub">{p.hold.message}</p>
+              <ul className="hold-list">{p.hold.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+              {p.withheld.length > 0 && <p className="muted small">근거가 없어 보여 드리지 않은 후보: {p.withheld.map((w) => w.kind_ko).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</p>}
+              <p style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+                <Link className="btn ghost" to="/ledger" style={{ textDecoration: 'none' }}>일정·거래처 등록하러 가기</Link>
+                <button className="btn" onClick={request} disabled={busy}>다시 요청</button>
+              </p>
+            </div>
           ) : (
             <>
               <div className="card">
@@ -142,6 +159,13 @@ export default function LiveAgent() {
               <button className="btn" disabled={busy} onClick={(ev) => { ev.stopPropagation(); decide(x.plan_id, 'approve') }}>이 안 승인</button>
             </article>
           ))}
+          {p && !p.hold && p.withheld.length > 0 && (
+            <div className="card withheld">
+              <h2>근거 부족 <span className="count">{p.withheld.length}</span></h2>
+              <p className="sub">계약 근거가 없어 효과를 보여 드리지 않은 후보예요.</p>
+              {p.withheld.map((w, i) => <div className="row" key={i}><span>{w.title}<br /><span className="muted">{w.missing}</span></span><span className="pill">근거 부족</span></div>)}
+            </div>
+          )}
           {p && p.plans.length > 0 && <button className="btn ghost" onClick={request} disabled={busy}>다시 계산</button>}
           {approved.length > 0 && (
             <div className="card" style={{ marginTop: 16 }}>

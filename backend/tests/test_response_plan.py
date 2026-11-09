@@ -2,7 +2,7 @@
 from datetime import date
 
 import pytest
-from tests.helpers import register_sample
+from tests.helpers import add_contract_doc, doc_evidence, register_sample
 
 from app.domain import response as rp
 from app.domain.enums import SignalLevel
@@ -60,8 +60,9 @@ def test_shift_limit_per_kind():
 
 @pytest.fixture(autouse=True)
 def no_graph(monkeypatch):
-    """근거 검색은 US-07 테스트가 맡는다. 여기서는 Neo4j 없이 돌도록 근거 없음으로 둔다 (필요한 테스트는 다시 덮어쓴다)."""
-    monkeypatch.setattr(response_service.evidence_service, "collect", lambda s, r: {"run_id": r.run_id, "evidence": [], "message": "근거 없음"})
+    """근거 검색은 US-07 테스트가 맡는다. 여기서는 Neo4j 없이 운영자금대출 약정서 조각(L01-1)만 근거로 돌려준다.
+    문서 근거가 없으면 US-11에 따라 판단을 보류하므로, 대출 약정서는 red 픽스처에서 등록한다."""
+    monkeypatch.setattr(response_service.evidence_service, "collect", doc_evidence("L01-1"))
 
 
 def test_api_no_alert_no_plans(client):
@@ -73,6 +74,7 @@ def test_api_no_alert_no_plans(client):
 def red(client):
     """register_sample: 11/25 운영자금대출 상환에서 -210만 원 부족, 11/28 정산 300만 원 입금."""
     register_sample(client)
+    add_contract_doc("○○은행", "L01", "운영자금대출 약정서")
     return client.post("/api/forecasts", json={}).json()
 
 
@@ -81,7 +83,8 @@ def test_api_plans_ac01_ac02(client, red, monkeypatch):
     loan_event = next(d["cash_event_id"] for d in client.get(f"/api/alerts/{red['run_id']}/drivers").json()["drivers"] if d["label"].startswith("운영자금"))
     monkeypatch.setattr(response_service.evidence_service, "collect", lambda s, r: {"run_id": r.run_id, "message": None, "evidence": [
         {"id": "P1", "type": "GRAPH_PATH", "ref": f"event:{loan_event}", "text": "사업장 → 운영자금대출 → 11/25 상환"},
-        {"id": "P2", "type": "GRAPH_PATH", "ref": "event:-1", "text": "관계없는 경로"}]})
+        {"id": "P2", "type": "GRAPH_PATH", "ref": "event:-1", "text": "관계없는 경로"},
+        {"id": "D1", "type": "DOCUMENT_CHUNK", "ref": "L01-1", "text": "운영자금대출 약정서 지급 조건"}]})
     out = client.post("/api/response-plans").json()
     assert out["base"]["signal"] == "RED" and out["plans"]
     p = out["plans"][0]
@@ -89,7 +92,7 @@ def test_api_plans_ac01_ac02(client, red, monkeypatch):
     # 이번 달 한 번만 옮기는 안이라 다음 달 12/25 상환에서는 다시 모자라고, 결과에 그대로 나온다.
     assert p["kind"] == "LOAN_CHECK" and p["parts"] == [{"due_date": "2026-11-28", "amount": 2_800_000}]
     assert p["result"]["signal"] == "YELLOW" and p["result"]["first_shortage_date"] == "2026-12-25" and len(p["result"]["daily"]) == 84
-    assert [e["id"] for e in p["evidence"]] == ["P1"] and "(근거 P1)" in p["description"] and not p["evidence_missing"]
+    assert [e["id"] for e in p["evidence"]] == ["P1", "D1"] and "(근거 P1, D1)" in p["description"] and not p["evidence_missing"]
     assert p["status"] == "PROPOSED"
 
 
@@ -105,7 +108,8 @@ def test_api_plans_without_evidence_server(client, red, monkeypatch):
         raise RuntimeError("neo4j down")
     monkeypatch.setattr(response_service.evidence_service, "collect", down)
     out = client.post("/api/response-plans").json()
-    assert out["plans"] and out["plans"][0]["evidence_missing"] and out["message"] == response_service.EVIDENCE_DOWN
+    # US-11: 근거를 볼 수 없으면 계산 결과를 내보내지 않고 보류한다
+    assert out["plans"] == [] and out["hold"]["code"] == "NO_EVIDENCE" and out["hold"]["missing"] == [response_service.SERVER_DOWN]
 
 
 def test_api_approve_applies_and_survives_regeneration_ac03(client, red):

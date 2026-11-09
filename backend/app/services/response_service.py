@@ -1,4 +1,4 @@
-"""ResponseService (US-10·11): 경보에 대한 대응안 후보를 만들고, 대표가 승인한 안만 일정에 반영한다.
+"""ResponseService (US-10·11·12): 경보에 대한 대응안 후보를 만들고, 대표가 승인한 안만 일정에 반영한다.
 
 - 후보와 효과(최저 잔액·부족일)는 domain.response 규칙과 cashflow_engine이 만든다. LLM은 숫자를 만들지 않는다.
 - 설명에는 같은 계산(run)의 근거 ID(P=거래관계 경로, D=계약 문서 조각)를 붙인다 (AC-02).
@@ -9,7 +9,7 @@
 """
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -224,3 +224,53 @@ def cancel(s: Session, b: Business, p: ResponsePlan) -> ForecastRun:
 
 def approved(s: Session, b: Business) -> list[dict]:
     return [_dto(p) for p in sorted(schedule_service.approved_plans(s, b.business_id), key=lambda p: p.plan_id)]
+
+
+# ---------- US-12 거래처 협의 메시지 초안 ----------
+# 문장은 틀(템플릿)로 만든다: 초안 속 날짜·금액이 승인한 안(계산 모듈 결과)과 반드시 같아야 하기 때문이다 (AC-04).
+# 사정을 지어내지 않도록 이유는 "자금 일정상"으로만 쓴다. 발송 기능은 없다. 화면에서 복사만 한다 (AC-02).
+
+def _recipient(s: Session, p: ResponsePlan) -> str:
+    if p.source_type == CashSource.LOAN:
+        loan = s.get(Loan, p.source_id)
+        return loan.lender if loan else "은행"
+    cid = p.source_id if p.source_type == CashSource.CONTRACT else getattr(s.get(FixedCost, p.source_id), "contract_id", None)
+    c = s.get(Contract, cid) if cid else None
+    if c and c.counterparty:
+        return c.counterparty.name
+    fc = s.get(FixedCost, p.source_id) if p.source_type == CashSource.FIXED_COST else None
+    return fc.name if fc else "거래처"
+
+
+def _item(label: str, to: str) -> str:
+    """'대성유통 매입 대금' → '매입 대금'. 받는 사람 이름이 앞에 붙은 라벨에서 이름을 뗀다."""
+    return label[len(to):].strip() if label.startswith(to) and label != to else label
+
+
+def draft(s: Session, b: Business, p: ResponsePlan) -> dict:
+    if p.status != PlanStatus.APPROVED:
+        raise PlanConflict("승인한 대응안만 메시지 초안을 만들 수 있어요.")
+    to = _recipient(s, p)
+    label = s.scalar(select(CashEvent.label).where(CashEvent.business_id == b.business_id, CashEvent.source_type == p.source_type,
+                                                   CashEvent.source_id == p.source_id).limit(1)) or p.title
+    item, amt, d0 = _item(label, to), p.original_amount, p.original_date
+    parts = [(date.fromisoformat(x["due_date"]), x["amount"]) for x in json.loads(p.parts)]
+    biz = b.name or "저희"
+    d = lambda x: f"{x.month}월 {x.day}일"  # noqa: E731
+    if p.kind == "PURCHASE_SPLIT":
+        (_, first), (d1, rest) = parts
+        ask = (f"{d(d0)}에 드리기로 한 {item} {amt:,}원을 나누어 지급해도 될지 여쭙습니다. "
+               f"{first:,}원은 예정대로 {d(d0)}에 드리고, 나머지 {rest:,}원은 {d(d1)}에 드리려고 합니다.")
+    elif p.kind == "LOAN_CHECK":
+        (d1, _), = parts
+        ask = (f"{d(d0)} 상환 예정인 {item} {amt:,}원의 상환일을 {d(d1)}로 조정할 수 있는지 상담을 요청드립니다. "
+               "연체로 처리되지 않고 조정할 수 있는지, 필요한 절차와 추가 이자가 있는지 안내 부탁드립니다.")
+    else:
+        (d1, _), = parts
+        ask = (f"{d(d0)}에 드리기로 한 {item} {amt:,}원의 지급일을 {d(d1)}로 {(d1 - d0).days}일 미뤄 주실 수 있을지 여쭙습니다. "
+               f"{d(d1)}에는 꼭 지급하겠습니다.")
+    why = "자금 일정상 해당 날짜에 맞추기가 어려워 미리 말씀드립니다." if p.kind != "LOAN_CHECK" else "자금 일정상 해당 날짜 상환이 빠듯하여 미리 문의드립니다."
+    text = f"{to} 담당자님, 안녕하세요. {biz}입니다.\n\n{why} {ask}\n\n가능 여부를 알려 주시면 감사하겠습니다.\n{biz} 드림"
+    facts = [{"label": "원래 날짜", "value": d0.isoformat()}, {"label": "원래 금액", "value": amt}] + \
+            [{"label": f"지급 {i}", "value": f"{x.isoformat()} {a}"} for i, (x, a) in enumerate(parts, 1)]
+    return {"plan_id": p.plan_id, "to": to, "text": text, "facts": facts}

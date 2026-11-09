@@ -380,3 +380,11 @@ input[type='range'] { accent-color: var(--brand); }
 .cond-body .inline input { width: 80px; }
 details.card summary { cursor: pointer; font-weight: 600; }
 .kpis.compare .kpi b { font-size: 16px; white-space: nowrap; }
+
+/* 대응안 비교 표 (US-10) */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12.5px; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+.table td { padding: 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.table td.num { text-align: right; }
+.pill.green { background: var(--green-bg); color: var(--green); }
+.plan { cursor: pointer; }

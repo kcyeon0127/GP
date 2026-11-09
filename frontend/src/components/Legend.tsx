@@ -1,5 +1,6 @@
 // 범례: 노드 모양은 보이는 종류 버튼 안에 넣고(GroupIcon), 엣지 선 모양만 따로 짧게 보여 준다(EdgeLegend).
 import type { Group } from '../graph/describe.ts'
+import { MONEY_IN, MONEY_OUT } from './GraphView.tsx'
 
 interface Icon { color: string; fill: string; dash?: string; shape: React.ReactNode; title: string }
 const AMOUNT: Icon = { title: '금액', color: 'var(--muted)', fill: 'var(--widget)', shape: <polygon points="5,1 11,1 15,5 15,11 11,15 5,15 1,11 1,5" /> }
@@ -28,7 +29,8 @@ export function GroupIcon({ group }: { group: Group }) {
 export function EdgeLegend() {
   return (
     <div className="edge-legend" aria-label="선 범례">
-      <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="var(--muted)" strokeWidth="2.5" /></svg>돈이 움직임</span>
+      <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke={MONEY_IN} strokeWidth="2.6" /></svg>들어오는 돈 (+)</span>
+      <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke={MONEY_OUT} strokeWidth="2.6" /></svg>나가는 돈 (−)</span>
       <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="var(--muted)" strokeWidth="2" strokeDasharray="1.5 3" strokeLinecap="round" /></svg>조건·규칙</span>
       <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="#3b82c4" strokeWidth="1" strokeDasharray="1.5 3" strokeLinecap="round" /></svg>신호</span>
       <span className="k"><svg width="20" height="8" aria-hidden><line x1="0" y1="4" x2="20" y2="4" stroke="var(--red)" strokeWidth="3" /></svg>위험 경로</span>

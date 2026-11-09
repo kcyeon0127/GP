@@ -18,6 +18,9 @@ interface Props {
 }
 const NODE_CLASSES = 'at_risk triggered improved changed'
 const HOP_MS = 520 // 홉마다 켜지는 간격
+// 들어오는 돈·나가는 돈 색. 위험 경로(빨강)·개선(초록)과 겹치지 않는 파랑·주황을 쓴다(범례 EdgeLegend와 같은 값).
+export const MONEY_IN = '#1f77d0'
+export const MONEY_OUT = '#e0782a'
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // 색뿐 아니라 모양으로도 구분한다. 금액 노드(정산·매입 대금·고정비)는 어느 섹터에서나 팔각형이고,
@@ -88,8 +91,10 @@ export default function GraphView({ visible, showLabels, nodeMarks, edgeMarks, r
         { selector: 'edge', style: { width: 1.8, 'curve-style': 'bezier', 'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, 'line-color': v('--rule'), 'target-arrow-color': v('--rule'),
           'transition-property': 'line-color, target-arrow-color, width', 'transition-duration': reducedMotion() ? 0 : 300,
           label: '', 'font-size': 10.5, color: v('--muted'), 'text-background-color': v('--bg'), 'text-background-opacity': 0.9, 'text-background-padding': '2px', 'text-rotation': 'autorotate' } },
-        // 돈이 실제로 움직이는 엣지는 실선, 조건·규칙 관계는 점선, 신호는 얇은 점선
-        etype(['SETTLES', 'DEPOSITS_TO', 'FUNDS', 'PAYS_TO', 'CHARGED_TO'], v('--muted'), { 'line-style': 'solid', width: 2.4 }),
+        // 돈이 실제로 움직이는 엣지는 실선, 조건·규칙 관계는 점선, 신호는 얇은 점선.
+        // 들어오는 돈(정산→입금)과 나가는 돈(출금·대금 지급·카드 청구)은 색으로 나눠 방향을 바로 읽게 한다.
+        etype(['SETTLES', 'DEPOSITS_TO'], MONEY_IN, { 'line-style': 'solid', width: 2.6 }),
+        etype(['FUNDS', 'PAYS_TO', 'CHARGED_TO'], MONEY_OUT, { 'line-style': 'solid', width: 2.6 }),
         etype(['PAID_WITH'], v('--green'), { 'line-style': 'dashed', width: 2 }),
         etype(['GOVERNED_BY', 'HAS_CLAUSE'], v('--muted'), { 'line-style': 'dotted', width: 1.6 }),
         etype(['BENEFIT_APPLIES'], v('--green'), { 'line-style': 'dotted', width: 2.2 }),

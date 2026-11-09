@@ -45,9 +45,9 @@ export function nodeSub(n: GraphNode): string {
   switch (n.type) {
     case 'account': return `잔액 ${won(n.balance)}`
     case 'partner': return n.role === 'sales' ? '매출처' : '매입처'
-    case 'settlement': return `${won(n.amount)} · ${md(n.dueDate)}`
-    case 'payable': return `${won(n.amount)} · ${md(n.dueDate)}`
-    case 'fixed_cost': return `${won(n.amount)} · 매월 ${n.dueDay}일`
+    case 'settlement': return `+${won(n.amount)} · ${md(n.dueDate)}`
+    case 'payable': return `−${won(n.amount)} · ${md(n.dueDate)}`
+    case 'fixed_cost': return `−${won(n.amount)} · 매월 ${n.dueDay}일`
     case 'loan': return `${won(n.nextPaymentAmount)} · ${md(n.nextPaymentDate)} · ${n.rateType === 'variable' ? '변동' : '고정'} ${n.rate}%`
     case 'card': return `결제일 ${n.billingDay}일`
     case 'contract': return n.counterparty
@@ -61,9 +61,9 @@ export function nodeLines(n: GraphNode): [string, string][] {
   switch (n.type) {
     case 'account': return [['현재 잔액', won(n.balance)], ['최소 유지 잔액', won(n.minBalance)]]
     case 'partner': return [['구분', n.role === 'sales' ? '매출처(정산 받음)' : '매입처(대금 지급)'], ['사업자 상태', { active: '계속사업자', suspended: '휴업', closed: '폐업' }[n.bizStatus]]]
-    case 'settlement': return [['금액', won(n.amount)], ['예정일', md(n.dueDate)], ['3일 넘게 늦을 확률', `${Math.round(n.delayRisk * 100)}%`]]
-    case 'payable': return [['금액', won(n.amount)], ['지급일', md(n.dueDate)], ['결제수단', n.paymentMethod === 'account' ? '계좌이체' : n.paymentMethod]]
-    case 'fixed_cost': return [['금액', won(n.amount)], ['지급일', `매월 ${n.dueDay}일`]]
+    case 'settlement': return [['들어올 금액', `+${won(n.amount)}`], ['예정일', md(n.dueDate)], ['3일 넘게 늦을 확률', `${Math.round(n.delayRisk * 100)}%`]]
+    case 'payable': return [['나갈 금액', `−${won(n.amount)}`], ['지급일', md(n.dueDate)], ['결제수단', n.paymentMethod === 'account' ? '계좌이체' : n.paymentMethod]]
+    case 'fixed_cost': return [['나갈 금액', `−${won(n.amount)}`], ['지급일', `매월 ${n.dueDay}일`]]
     case 'loan': return [['잔액', won(n.principal)], ['금리', `연 ${n.rate}% (${n.rateType === 'variable' ? '변동' : '고정'})`], ['다음 상환', `${won(n.nextPaymentAmount)} · ${md(n.nextPaymentDate)}`]]
     case 'card': return [['결제일', `매월 ${n.billingDay}일`], ['한도', won(n.limit)], ['전월 실적', won(n.prevMonthSpend)], ...n.benefits.map((b): [string, string] => ['혜택', `${b.description}${b.minPrevMonthSpend ? ` (전월 실적 ${won(b.minPrevMonthSpend)} 이상)` : ''}`])]
     case 'contract': return [['상대방', n.counterparty], ['기간', n.period]]

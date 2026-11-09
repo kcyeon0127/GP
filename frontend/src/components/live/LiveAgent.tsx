@@ -1,4 +1,4 @@
-// 대응안 비교·승인 (US-10)과 근거 부족 시 판단 보류 (US-11) 서버 모드. 후보와 효과(최저 잔액·부족일)는 모두 백엔드(ResponseService)가 계산한다.
+// 대응안 비교·승인 (US-10), 근거 부족 시 판단 보류 (US-11), 협의 메시지 초안 (US-12) 서버 모드. 후보와 효과(최저 잔액·부족일)는 모두 백엔드(ResponseService)가 계산한다.
 // 화면은 숫자를 만들지 않고, 승인 전에는 아무 일정도 바꾸지 않는다 (AC-03).
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -53,12 +53,14 @@ export default function LiveAgent() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [done, setDone] = useState<{ plan: PlanDto; f: ForecastDto } | null>(null)
+  const [draft, setDraft] = useState<{ plan_id: number; to: string; text: string } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const loadApproved = () => api<PlanDto[]>('/api/response-plans/approved').then(setApproved).catch(() => setApproved([]))
   useEffect(() => { loadApproved() }, [])
 
   const request = async () => {
-    setBusy(true); setMsg(''); setDone(null)
+    setBusy(true); setMsg(''); setDone(null); setDraft(null)
     try {
       const r = await api<ProposalDto>('/api/response-plans', { method: 'POST' })
       setP(r); setPick(r.plans[0]?.plan_id ?? null)
@@ -71,11 +73,19 @@ export default function LiveAgent() {
     try {
       const r = await api<{ plan: PlanDto; forecast: ForecastDto }>(`/api/response-plans/${id}/${action}`, { method: 'POST' })
       if (action === 'approve') { setDone({ plan: r.plan, f: r.forecast }); setP(null) } else setDone(null)
+      setDraft(null)
       loadApproved()
     } catch (e) {
       setMsg((e as ApiError).message)
     } finally { setBusy(false) }
   }
+  // 초안은 승인한 안에서만 만든다 (US-12 AC-03). 보내기 기능은 두지 않고 복사만 한다 (AC-02).
+  const makeDraft = async (id: number) => {
+    setMsg(''); setCopied(false)
+    try { setDraft(await api<{ plan_id: number; to: string; text: string }>(`/api/response-plans/${id}/draft`, { method: 'POST' })) }
+    catch (e) { setMsg((e as ApiError).message) }
+  }
+  const copy = () => draft && navigator.clipboard.writeText(draft.text).then(() => setCopied(true)).catch(() => setMsg('복사하지 못했어요. 글을 직접 선택해서 복사해 주세요.'))
   const sel = p?.plans.find((x) => x.plan_id === pick) ?? null
   const evText = (id: string) => p?.evidence.find((e) => e.id === id)?.text ?? undefined
 
@@ -93,7 +103,10 @@ export default function LiveAgent() {
                 <div className="kpi"><span>12주 최저 잔액</span><b className={`num ${done.f.min_balance < 0 ? 'bad' : ''}`}>{won(done.f.min_balance)}</b></div>
                 <div className="kpi"><span>최초 부족일</span><b className="num">{day(done.f.first_shortage_date)}</b></div>
               </div>
-              <p style={{ marginTop: 14 }}><Link className="btn" to="/" style={{ textDecoration: 'none', display: 'inline-block' }}>홈에서 확인</Link></p>
+              <p style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn" onClick={() => makeDraft(done.plan.plan_id)}>협의 메시지 초안 만들기</button>
+                <Link className="btn ghost" to="/" style={{ textDecoration: 'none' }}>홈에서 확인</Link>
+              </p>
             </div>
           ) : !p ? (
             <div className="card">
@@ -140,6 +153,17 @@ export default function LiveAgent() {
               )}
             </>
           )}
+          {draft && (
+            <div className="card draft">
+              <h2>{draft.to}에 보낼 메시지 초안</h2>
+              <p className="sub">날짜와 금액은 승인한 대응안 그대로예요. 머니메이트는 메시지를 보내지 않아요. 복사해서 문자·메신저로 직접 보내 주세요.</p>
+              <textarea readOnly value={draft.text} rows={9} aria-label="협의 메시지 초안" />
+              <p style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button className="btn" onClick={copy}>복사</button>
+                {copied && <span className="ok" role="status">복사했어요</span>}
+              </p>
+            </div>
+          )}
           {msg && <p className="form-msg" role="alert">{msg}</p>}
         </div>
 
@@ -151,12 +175,15 @@ export default function LiveAgent() {
                 <span className={`pill ${x.result.signal === 'RED' ? 'red' : x.result.signal === 'YELLOW' ? 'yellow' : 'green'}`}>{i === 0 ? '효과 1위 · ' : ''}{SIGNAL_KO[x.result.signal]}</span>
               </header>
               <p>{x.description}</p>
-              <p className="evlist">
+              <p className="plan-ev">
                 {x.evidence_missing ? <span className="muted small">이 안에 붙일 근거를 찾지 못했어요.</span>
                   : x.evidence.map((e) => <span className="ev" key={e.id} title={e.text ?? evText(e.id)}>{e.id}</span>)}
               </p>
               <p className="cost">{x.caution}</p>
-              <button className="btn" disabled={busy} onClick={(ev) => { ev.stopPropagation(); decide(x.plan_id, 'approve') }}>이 안 승인</button>
+              <p style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: 0 }}>
+                <button className="btn" disabled={busy} onClick={(ev) => { ev.stopPropagation(); decide(x.plan_id, 'approve') }}>이 안 승인</button>
+                <button className="btn ghost" disabled title="승인하면 협의 메시지 초안을 만들 수 있어요">메시지 초안</button>
+              </p>
             </article>
           ))}
           {p && !p.hold && p.withheld.length > 0 && (
@@ -173,7 +200,10 @@ export default function LiveAgent() {
               {approved.map((x) => (
                 <div className="row" key={x.plan_id}>
                   <span>{x.title}<br /><span className="muted">{md(x.target.date)} → {x.parts.map((pt) => `${md(pt.due_date)} ${won(pt.amount)}`).join(', ')}</span></span>
-                  <button className="btn ghost" disabled={busy} onClick={() => decide(x.plan_id, 'cancel')}>되돌리기</button>
+                  <span style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn ghost" onClick={() => makeDraft(x.plan_id)}>초안</button>
+                    <button className="btn ghost" disabled={busy} onClick={() => decide(x.plan_id, 'cancel')}>되돌리기</button>
+                  </span>
                 </div>
               ))}
             </div>

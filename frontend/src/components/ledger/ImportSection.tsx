@@ -1,5 +1,6 @@
 // 거래내역 파일로 한 번에 등록 (입력 편의). 서버가 반복 거래를 찾아 후보로 돌려주면,
 // 사장님은 체크만 하고 "등록"을 누른다. 저장은 기존 거래처·고정비·대출 등록 API를 그대로 쓴다.
+// US-17: 읽지 못한 줄을 줄 번호·사유로 보여 주고, 표기만 다른 거래처 이름은 묶기를 제안한다.
 import { useState, type ChangeEvent } from 'react'
 import { api, md, type ApiError } from '../../api.ts'
 import { won } from '../../data.ts'
@@ -9,7 +10,12 @@ interface CandidateDto {
   name: string; direction: 'IN' | 'OUT'; kind: Kind; pay_cycle: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY'; pay_day: number; amount: number
   months: string | null; count: number; dates: string[]; varies: boolean; already: boolean; same_as: string | null
 }
-interface ImportDto { rows: number; period: [string, string]; last_balance: { date: string; balance: number } | null; candidates: CandidateDto[] }
+interface IssueDto { line: number; reason: string; text: string }
+interface MergeDto { to: string; names: string[]; count: number }
+interface ImportDto {
+  rows: number; period: [string, string]; last_balance: { date: string; balance: number } | null; candidates: CandidateDto[]
+  issues: IssueDto[]; merge_suggestions: MergeDto[] // US-17
+}
 interface Row extends CandidateDto { on: boolean; id: string }
 
 const KIND_KO: Record<Kind, string> = { SALES: '매출처(받을 돈)', PURCHASE: '매입처(줄 돈)', FIXED_COST: '고정비', LOAN: '대출 상환' }
@@ -54,6 +60,8 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [text, setText] = useState('') // 병합을 승인하면 같은 파일을 다시 보낸다 (US-17)
+  const [merges, setMerges] = useState<Record<string, string>>({})
   const set = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)))
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -62,11 +70,22 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
     if (!file) return
     setMsg(''); setErr(''); setData(null); setRows([])
     if (file.size > MAX_FILE) { setErr('파일이 너무 커요. 5MB 이하로 기간을 줄여 다시 받아 주세요.'); return }
+    const t = await readText(file)
+    setText(t); setMerges({})
+    await send(t, {})
+  }
+  const send = async (t: string, m: Record<string, string>) => {
     try {
-      const d = await api<ImportDto>('/api/imports/transactions', { method: 'POST', body: { text: await readText(file) } })
+      const d = await api<ImportDto>('/api/imports/transactions', { method: 'POST', body: { text: t, merges: m } })
       setData(d)
       setRows(d.candidates.map((c) => ({ ...c, on: !c.already, id: `${c.name}-${c.direction}` }))) // 이미 등록된 이름은 꺼 둔다: 눌러도 409로 막히거나 고정비가 두 번 잡힌다
     } catch (ex) { setErr((ex as ApiError).message) }
+  }
+  const merge = (g: MergeDto) => {
+    const m = { ...merges, ...Object.fromEntries(g.names.map((n) => [n, g.to])) }
+    setMerges(m)
+    setMsg(`${g.names.join(', ')}을(를) "${g.to}" 하나로 묶었어요.`)
+    send(text, m)
   }
   const register = async () => {
     setBusy(true)
@@ -105,6 +124,25 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
           <p className="sub">{md(data.period[0])}~{md(data.period[1])} 거래 {data.rows}건에서 정기 일정 <b>{rows.length}개</b>를 찾았어요.
             {data.last_balance && <button type="button" className="link-btn" onClick={setBalance}>현재 잔액을 {won(data.last_balance.balance)}으로 맞추기</button>}
           </p>
+          {data.issues.length > 0 && (
+            <details className="import-issues">
+              <summary><b>읽지 못한 줄 {data.issues.length}개</b>는 빼고 계산했어요. 파일에서 그 줄을 고쳐 다시 올리면 함께 반영돼요.</summary>
+              <ul>
+                {data.issues.map((x) => <li key={x.line}><b>{x.line}번째 줄</b> {x.reason}<br /><span className="muted">{x.text}</span></li>)}
+              </ul>
+            </details>
+          )}
+          {data.merge_suggestions.length > 0 && (
+            <div className="import-merges">
+              <p className="sub" style={{ marginBottom: 6 }}>이름 표기만 다른 거래처가 있어요. 같은 곳이면 묶어 주세요.</p>
+              {data.merge_suggestions.map((g) => (
+                <div className="row" key={g.to}>
+                  <span>{g.names.join(' · ')} <span className="muted">({g.count}건)</span></span>
+                  <button type="button" className="btn ghost" onClick={() => merge(g)}>"{g.to}"(으)로 묶기</button>
+                </div>
+              ))}
+            </div>
+          )}
           {rows.length === 0 && <p className="muted">반복되는 입출금을 찾지 못했어요. 2달 이상 기간으로 다시 받아 보세요.</p>}
           <ul className="cands">
             {rows.map((r, i) => (

@@ -1,4 +1,7 @@
-"""입력 편의: 거래내역 CSV에서 정기 일정 후보 찾기. 후보만 돌려주고 저장은 기존 등록 API가 한다."""
+"""입력 편의: 거래내역 CSV에서 정기 일정 후보 찾기. 후보만 돌려주고 저장은 기존 등록 API가 한다.
+
+US-17: 읽지 못한 행(형식·결측·중복)을 줄 번호·사유로 돌려주고 정상 행만 쓴다. 표기만 다른 거래처 이름은 병합을 제안한다.
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -17,6 +20,8 @@ router = APIRouter(prefix="/api")
 # 은행 파일의 EUC-KR은 브라우저 TextDecoder로 풀 수 있기 때문이다.
 class ImportIn(BaseModel):
     text: str = Field(min_length=1, max_length=5_000_000, description="CSV 파일 내용 (화면에서 UTF-8/EUC-KR을 풀어 보낸다)")
+    # US-17: 사장님이 승인한 이름 병합 {파일에 적힌 표기: 남길 이름}. 승인한 뒤 같은 파일을 다시 보내면 묶어서 찾는다.
+    merges: dict[str, str] = Field(default_factory=dict, max_length=500)
 
 
 def _registered(s: Session, b: Business) -> list[tx.Registered]:
@@ -37,14 +42,20 @@ def _registered(s: Session, b: Business) -> list[tx.Registered]:
 @router.post("/imports/transactions")
 def import_transactions(body: ImportIn, s: Session = Depends(get_session), b: Business = Depends(business)):
     try:
-        txns = tx.parse_csv(body.text)
+        txns, issues = tx.parse_checked(body.text)
     except tx.CsvFormatError as e:
         raise HTTPException(422, detail=str(e))
     registered = _registered(s, b)
     last = tx.last_balance(txns)
-    found = [(c, tx.same_schedule(c, registered)) for c in tx.detect(txns)]
+    merges = {k: v.strip() for k, v in body.merges.items() if v.strip()}
+    found = [(c, tx.same_schedule(c, registered)) for c in tx.detect(txns, merges)]
+    names = [r.name for r in registered if r.name]
+    # 이미 승인한 병합은 다시 제안하지 않는다
+    suggest = [m for m in tx.merge_suggestions(txns, names) if not all(merges.get(n, n) == m.to for n in m.names)]
     return {
         "rows": len(txns),
+        "issues": [dict(line=x.line, reason=x.reason, text=x.text) for x in issues],
+        "merge_suggestions": [dict(to=m.to, names=m.names, count=m.count) for m in suggest],
         "period": [txns[0].day, txns[-1].day],
         "last_balance": {"date": last[0], "balance": last[1]} if last else None,
         "candidates": [dict(name=c.name, direction=c.direction, kind=c.kind, pay_cycle=c.pay_cycle, pay_day=c.pay_day, amount=c.amount,

@@ -4,6 +4,7 @@
 import { useState, type ChangeEvent } from 'react'
 import { api, md, type ApiError } from '../../api.ts'
 import { won } from '../../data.ts'
+import TermEstimates from './TermEstimates.tsx'
 
 type Kind = 'SALES' | 'PURCHASE' | 'FIXED_COST' | 'LOAN'
 interface CandidateDto {
@@ -62,6 +63,7 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
   const [busy, setBusy] = useState(false)
   const [text, setText] = useState('') // 병합을 승인하면 같은 파일을 다시 보낸다 (US-17)
   const [merges, setMerges] = useState<Record<string, string>>({})
+  const [saved, setSaved] = useState(0) // 후보를 등록하면 추정 목록을 다시 불러와 확정할 수 있게 한다 (US-14)
   const set = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)))
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -100,6 +102,7 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
     const loans = rows.some((r) => r.on && r.kind === 'LOAN' && done.includes(r.name))
     setMsg(`${done.length}건을 등록했어요.${skipped.length ? ` 건너뛴 것: ${skipped.join(', ')}.` : ''}${loans ? ' 대출 잔액·금리는 아래 대출 목록에서 "수정"으로 채워 주세요.' : ''}`)
     setRows((rs) => rs.map((r) => (done.includes(r.name) ? { ...r, on: false, already: true } : r)))
+    setSaved((k) => k + 1)
     onSaved()
   }
   const setBalance = async () => {
@@ -159,6 +162,7 @@ export default function ImportSection({ onSaved }: { onSaved: () => void }) {
             ))}
           </ul>
           {rows.length > 0 && <button className="btn" type="button" disabled={!picked || busy} onClick={register}>{busy ? '등록 중…' : `선택한 ${picked}건 등록`}</button>}
+          <TermEstimates text={text} merges={merges} refresh={saved} onSaved={onSaved} />
         </>
       )}
       {msg && <p className="ok-msg" role="status">{msg}</p>}

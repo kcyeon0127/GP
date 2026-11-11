@@ -62,3 +62,13 @@ def test_baselines_and_auto_threshold():
     sched = bt.run(t, None, method="schedule")
     assert all(p.mae == 0 for p in sched)  # 하위 20% 기준을 써도 정기 일정만 있는 가게는 오차 0
     assert len(bt.run(t, None, method="trend")) == len(sched)
+
+
+def test_synth_store_is_deterministic_and_delayed():
+    from app.domain.synth import make_store
+    a, b = make_store(1, date(2025, 1, 1), 6, 7, 0, seed=1), make_store(1, date(2025, 1, 1), 6, 7, 0, seed=1)
+    assert a.txns == b.txns and a.terms == b.terms
+    on_time = make_store(1, date(2025, 1, 1), 6, 0, 0, seed=1)
+    late = [t.day for t in a.txns if t.desc == a.sales[0][0]]
+    due = [t.day for t in on_time.txns if t.desc == a.sales[0][0]]
+    assert all(x >= y for x, y in zip(late, due)) and all(t.day.weekday() < 5 for t in a.txns)  # 늦게, 평일에만 들어온다

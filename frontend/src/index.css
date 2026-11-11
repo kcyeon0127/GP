@@ -393,3 +393,9 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .draft textarea { width: 100%; font: inherit; line-height: 1.6; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); color: var(--ink); resize: vertical; }
 .plan-ev { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 4px; }
 .plan-ev .ev { margin: 0; cursor: help; }
+
+/* US-17 입력 예외 안내 */
+.import-issues { margin: 8px 0 12px; font-size: 13.5px; }
+.import-issues ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.import-merges { margin: 4px 0 12px; }
+.import-merges .btn { padding: 5px 12px; font-size: 13px; flex: none; }

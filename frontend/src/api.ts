@@ -50,6 +50,12 @@ export interface ForecastDto {
   first_shortage_date: string | null; shortage_amount: number | null; max_shortage_amount: number | null
   min_balance: number; min_balance_date: string; first_below_safe_date: string | null; has_events: boolean; message: string
   daily?: { date: string; balance: number }[]
+  conservative?: ConservativeDto | null
+}
+/** US-15: 확정한 입금 지연일을 반영한 보수 예측. applied=0이면 기본 예측과 같다. */
+export interface ConservativeDto {
+  applied: number; moved: string[]; signal: SignalLevel; first_shortage_date: string | null; shortage_amount: number | null
+  min_balance: number; min_balance_date: string; daily: { date: string; balance: number }[]
 }
 export interface DriverDto { cash_event_id: number; date: string; label: string; direction: 'IN' | 'OUT'; amount: number; role: 'BEFORE' | 'AFTER' }
 export interface EvidenceDto { id: string; type: 'GRAPH_PATH' | 'DOCUMENT_CHUNK'; ref: string; text: string; score?: number }

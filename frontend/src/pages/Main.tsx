@@ -56,6 +56,15 @@ function LiveHome() {
                   : <><b>부족 예상 없음</b>. </>}
                 최저 잔액은 <b className="num">{won(f.min_balance)}</b> ({md(f.min_balance_date)})예요. 0원 아래는 빨간색, 노란 점선은 안전 잔액이에요.
               </p>
+              {f.conservative && f.conservative.applied > 0 && (
+                <p className="sub late-note">
+                  확정한 입금 지연({f.conservative.applied}곳)을 반영하면{' '}
+                  {f.conservative.first_shortage_date
+                    ? <>최초 부족일 <b className="num bad">{md(f.conservative.first_shortage_date)}</b> · 부족액 <b className="num bad">{won(f.conservative.shortage_amount!)}</b></>
+                    : <b>부족 예상 없음</b>}
+                  이에요. 점선이 이 보수 예측이에요.
+                </p>
+              )}
               {!f.has_events && <p className="empty-note">{f.message} <Link to="/ledger">일정 등록하기 →</Link></p>}
               <LiveChart f={f} days={full ? 84 : 28} height={230} />
               <p className="later">

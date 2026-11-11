@@ -10,7 +10,7 @@
 추정값은 대표자가 확정하기 전까지 "추정"이다. 확정한 지연일만 예측(US-15)에 쓴다.
 """
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 from .schedule import clamp_day
@@ -117,3 +117,11 @@ def estimate(txns: list[Txn], registered: list[Registered] = (), merges: dict[st
         out.append(e)
     order = {"ESTIMATED": 0, "IRREGULAR": 1, "INSUFFICIENT": 2}
     return sorted(out, key=lambda x: (order[x.status], x.counterparty_id is None, -x.amount))
+
+
+def apply_delays(items: list, delays: dict[int, int]) -> list:
+    """US-15 T5: 확정한 지연일만큼 그 매출처 입금을 뒤로 민다 (scenario.Item 목록, 원본은 그대로).
+
+    지연 이력이 없는 거래처(delays에 없거나 0일)는 그대로라, 확정값이 없으면 기본 예측과 같다 (T7).
+    """
+    return [replace(i, due_date=i.due_date + timedelta(days=delays[i.party_id])) if i.kind == "SALES" and delays.get(i.party_id) else i for i in items]

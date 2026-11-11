@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..db import get_session
 from ..models import Business, CashEvent, ForecastRun
 from ..schemas import DailyBalance, ForecastIn, ForecastOut
-from ..services import forecast_service
+from ..services import delay_service, forecast_service
 from .deps import business
 
 router = APIRouter(prefix="/api")
@@ -38,7 +38,9 @@ def _run(s: Session, run_id: int, b: Business) -> ForecastRun:
 def create_forecast(body: ForecastIn, s: Session = Depends(get_session), b: Business = Depends(business)):
     r = forecast_service.run(s, b, body.base_date, body.current_balance, body.safety_balance)
     s.commit()
-    return _out(s, r, with_daily=True)
+    out = _out(s, r, with_daily=True)
+    out.conservative = delay_service.conservative(s, b)
+    return out
 
 
 @router.get("/forecasts/{run_id}/daily", response_model=list[DailyBalance])

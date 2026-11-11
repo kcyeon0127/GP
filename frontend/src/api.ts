@@ -56,3 +56,16 @@ export interface EvidenceDto { id: string; type: 'GRAPH_PATH' | 'DOCUMENT_CHUNK'
 export interface GraphDto { nodes: { id: string; label: string; props: Record<string, unknown> }[]; edges: { id: string; source: string; target: string; type: string }[] }
 
 export const md = (iso: string) => `${+iso.slice(5, 7)}/${+iso.slice(8, 10)}`
+
+// US-08 위험 영향 경로 (GET /api/scenarios/{id}/impact-path)
+export interface PathNodeRef { label: 'Business' | 'Counterparty' | 'Contract' | 'FixedCost' | 'Loan'; id?: number }
+export interface PathStepDto {
+  role: 'CAUSE' | 'SHORTAGE' | 'PAYMENT'; order: number | null; evidence_id: string | null; label: string
+  date: string; after_date?: string; end_date?: string; amount: number; balance?: number; new?: boolean
+  source: { type: 'CONTRACT' | 'FIXED_COST' | 'LOAN'; id: number } | null; nodes: PathNodeRef[]
+}
+export interface ImpactPathDto {
+  scenario_id: number; kinds: string[]; message: string; steps: PathStepDto[]
+  shortage: { first_date: string; last_date: string; amount: number; min_balance: number } | null
+}
+export interface ScenarioListDto { scenario_id: number; kinds: string[]; params: { delay_counterparty_id: number | null; delay_days: number; revenue_drop_pct: number; cost_rise_pct: number; rate_rise_pp: number } }

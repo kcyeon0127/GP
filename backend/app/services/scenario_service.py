@@ -7,13 +7,17 @@ import json
 from dataclasses import asdict
 from datetime import date
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..domain import cashflow_engine
+from ..domain import impact_path as ip
 from ..domain import scenario as sc
 from ..domain.constants import HORIZON_DAYS
 from ..domain.enums import CashSource, ContractType, RateType
 from ..models import Business, Contract, ForecastDaily, ForecastRun, Loan, Scenario
+from ..repositories import graph_repository as g
+from . import graph_service
 from .forecast_service import events_of
 
 KIND_OF_CONTRACT = {ContractType.SALES: "SALES", ContractType.PURCHASE: "PURCHASE"}
@@ -85,3 +89,68 @@ def run(s: Session, b: Business, cond: sc.Conditions) -> dict:
 
 def conditions_of(scn: Scenario) -> sc.Conditions:
     return sc.Conditions(**json.loads(scn.params))
+
+
+# ---------- US-08 위험 영향 경로 ----------
+# 예정 입출금에서 금융지도 노드까지: 출처(계약·고정비·대출) → 근거 계약 → 거래처
+CHAIN_CYPHER = """
+MATCH (src)-[:GENERATES]->(e:CashEvent) WHERE e.cash_event_id IN $ids
+OPTIONAL MATCH (src)-[:BASED_ON]->(base:Contract)
+WITH e, src, CASE WHEN src:Contract THEN src ELSE base END AS k
+OPTIONAL MATCH (c:Counterparty)-[:PARTY_TO]->(k)
+RETURN e.cash_event_id AS event_id, labels(src)[0] AS src_label,
+       coalesce(src.contract_id, src.fixed_cost_id, src.loan_id) AS src_id,
+       k.contract_id AS contract_id, c.counterparty_id AS counterparty_id, c.name AS counterparty
+"""
+SRC_LABEL = {"CONTRACT": "Contract", "FIXED_COST": "FixedCost", "LOAN": "Loan"}
+
+
+def _chains(s: Session, b: Business, ids: list[int]) -> dict[int, dict]:
+    if not ids:
+        return {}
+    # 일정을 고치면 예정 입출금이 새 ID로 다시 만들어져 Neo4j에 없을 수 있다 (근거 조회와 같은 처리)
+    found = {r["id"] for r in g.query("MATCH (e:CashEvent) WHERE e.cash_event_id IN $ids RETURN e.cash_event_id AS id", ids=ids)}
+    if found != set(ids):
+        graph_service.sync(s, b)
+    return {r["event_id"]: r for r in g.query(CHAIN_CYPHER, ids=ids)}
+
+
+def _nodes(step: dict, chain: dict | None) -> list[dict]:
+    """금융지도에서 이 단계로 강조할 노드 (라벨 + 원본 ID). 화면은 노드 props의 같은 ID로 찾는다."""
+    if step["role"] == "SHORTAGE":
+        return [{"label": "Business"}]
+    src = step["source"]
+    out = [{"label": SRC_LABEL[src.source_type], "id": src.source_id}]
+    if chain:
+        if chain["contract_id"] and not (src.source_type == "CONTRACT" and chain["contract_id"] == src.source_id):
+            out.append({"label": "Contract", "id": chain["contract_id"]})
+        if chain["counterparty_id"]:
+            out.append({"label": "Counterparty", "id": chain["counterparty_id"]})
+    return out[::-1] if step["role"] == "CAUSE" else out  # 원인은 거래처 → 계약 순, 지급은 계약 → 거래처 순
+
+
+def impact_path(s: Session, b: Business, scn: Scenario) -> dict:
+    """GET /api/scenarios/{id}/impact-path. 기준안·시나리오는 compare()처럼 지금 등록 일정으로 다시 계산한다."""
+    cond = conditions_of(scn)
+    events = events_of(s, b.business_id)
+    items = items_of(s, b)
+    after = sc.apply(items, cond)
+    base_f = cashflow_engine.forecast(b.base_date, b.current_balance, b.safety_balance, [(i.due_date, i.amount) for i in items])
+    scen_f = cashflow_engine.forecast(b.base_date, b.current_balance, b.safety_balance, [(i.due_date, i.amount) for i in after])
+    sources = {e.cash_event_id: ip.Source(e.source_type.value, e.source_id) for e in events}
+    out = ip.build(b.base_date, items, after, base_f.daily, scen_f.daily, sources, cond.kinds())
+    chains = _chains(s, b, sorted({eid for st in out["steps"] for eid in st["events"]}))
+    steps = []
+    for st in out["steps"]:
+        chain = chains.get(st["events"][0]) if st["events"] else None
+        label = st["label"]
+        if st["role"] == "CAUSE" and chain and chain["counterparty"] and not label.startswith(chain["counterparty"]):
+            label = f"{chain['counterparty']} {label}"
+        src = st.pop("source")
+        steps.append({**st, "label": label, "source": {"type": src.source_type, "id": src.source_id} if src else None, "nodes": _nodes({**st, "source": src}, chain)})
+    return {"scenario_id": scn.scenario_id, "kinds": cond.kinds(), "shortage": out["shortage"], "steps": steps, "message": out["message"]}
+
+
+def list_scenarios(s: Session, b: Business) -> list[dict]:
+    rows = s.scalars(select(Scenario).where(Scenario.business_id == b.business_id).order_by(Scenario.scenario_id.desc()).limit(20))
+    return [{"scenario_id": x.scenario_id, "kinds": conditions_of(x).kinds(), "params": json.loads(x.params)} for x in rows]

@@ -127,6 +127,17 @@ class Scenario(Base):
     params: Mapped[str] = mapped_column(Text)
 
 
+class ConfirmedTerm(Base):
+    """US-14: 대표자가 확정한 거래처별 입금 지연일. US-15 보수 예측이 이 값만 쓴다 (추정값은 확정 전까지 쓰지 않는다)."""
+    __tablename__ = "confirmed_term"
+    __table_args__ = (CheckConstraint("delay_days BETWEEN 0 AND 60", name="ck_confirmed_term_delay"),)
+    counterparty_id: Mapped[int] = mapped_column(ForeignKey("counterparty.counterparty_id", ondelete="CASCADE"), primary_key=True)
+    business_id: Mapped[int] = mapped_column(ForeignKey("business.business_id", ondelete="CASCADE"))
+    delay_days: Mapped[int] = mapped_column(Integer)
+    sample_count: Mapped[int] = mapped_column(Integer)  # 추정에 쓴 입금 건수 (근거)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class Document(Base):
     __tablename__ = "document"
     document_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

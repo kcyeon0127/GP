@@ -53,3 +53,12 @@ def test_sample_runs_and_irregular_average_reduces_error():
 
 def test_too_short_file_has_no_points():
     assert bt.run(_monthly_file(months=1), 0) == []
+
+
+def test_baselines_and_auto_threshold():
+    t = _monthly_file()
+    flat = bt.run(t, None, method="flat")
+    assert flat and all(p.predicted_alert is None or p.start_below for p in flat)  # 잔액 유지는 기준 아래에서 시작할 때만 경보
+    sched = bt.run(t, None, method="schedule")
+    assert all(p.mae == 0 for p in sched)  # 하위 20% 기준을 써도 정기 일정만 있는 가게는 오차 0
+    assert len(bt.run(t, None, method="trend")) == len(sched)

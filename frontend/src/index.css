@@ -399,3 +399,11 @@ details.card summary { cursor: pointer; font-weight: 600; }
 .import-issues ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
 .import-merges { margin: 4px 0 12px; }
 .import-merges .btn { padding: 5px 12px; font-size: 13px; flex: none; }
+
+/* US-14 결제조건 추정 */
+.terms { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.terms h3 { font-size: 15px; margin-bottom: 4px; }
+.row.term { align-items: center; flex-wrap: wrap; }
+.term-edit { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.term-edit input { width: 56px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 5px 6px; font: inherit; }
+.term-edit .btn { padding: 5px 12px; font-size: 13px; }

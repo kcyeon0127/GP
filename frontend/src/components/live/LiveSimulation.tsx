@@ -113,7 +113,10 @@ export default function LiveSimulation() {
                     {r.new_shortages.map((x) => (
                       <div className="row" key={x.event_id}><span>{x.label}<br /><span className="muted">{md(x.date)} · 그날 잔액 {won(x.balance)}</span></span><b className="num bad">-{won(x.amount)}</b></div>
                     ))}
-                    <p style={{ marginTop: 14 }}><Link className="btn" to="/agent" style={{ textDecoration: 'none', display: 'inline-block' }}>대응안 보기</Link></p>
+                    <p style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Link className="btn" to="/agent" style={{ textDecoration: 'none', display: 'inline-block' }}>대응안 보기</Link>
+                      <Link className="btn ghost" to={`/map/mine?scenario=${r.scenario_id}`} style={{ textDecoration: 'none', display: 'inline-block' }}>금융지도에서 영향 경로 보기</Link>
+                    </p>
                   </>
                 )}
               </div>

@@ -1,4 +1,4 @@
-"""US-09: What-if 시나리오 실행과 기준안 비교."""
+"""US-09: What-if 시나리오 실행과 기준안 비교. US-08: 시나리오의 위험 영향 경로."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -45,11 +45,30 @@ def create_scenario(body: ScenarioIn, s: Session = Depends(get_session), b: Busi
     return out
 
 
-@router.get("/scenarios/{scenario_id}/comparison")
-def scenario_comparison(scenario_id: int, s: Session = Depends(get_session), b: Business = Depends(business)):
+@router.get("/scenarios")
+def list_scenarios(s: Session = Depends(get_session), b: Business = Depends(business)):
+    """US-08 AC-06: 저장된 시나리오를 골라 경로를 바꿔 보려고 최근 20개를 돌려준다."""
+    return scenario_service.list_scenarios(s, b)
+
+
+def _scenario(s: Session, scenario_id: int, b: Business) -> Scenario:
     scn = s.get(Scenario, scenario_id)
     if not scn or scn.business_id != b.business_id:
         raise HTTPException(404, detail="시나리오가 없습니다")
+    return scn
+
+
+@router.get("/scenarios/{scenario_id}/impact-path")
+def scenario_impact_path(scenario_id: int, s: Session = Depends(get_session), b: Business = Depends(business)):
+    """US-08: 문제 원인 → 잔액 부족일 → 먼저 막히는 지급 순서. 4주 안 부족이 없으면 steps가 빈 목록이다."""
+    out = scenario_service.impact_path(s, b, _scenario(s, scenario_id, b))
+    s.commit()  # 그래프가 오래돼 다시 맞췄을 수 있다
+    return out
+
+
+@router.get("/scenarios/{scenario_id}/comparison")
+def scenario_comparison(scenario_id: int, s: Session = Depends(get_session), b: Business = Depends(business)):
+    scn = _scenario(s, scenario_id, b)
     out = scenario_service.compare(s, b, scenario_service.conditions_of(scn))
     out.pop("_forecast")
     return {"scenario_id": scenario_id, "kinds": scenario_service.conditions_of(scn).kinds(), **out}

@@ -102,3 +102,30 @@ def search_question(s: Session, business_id: int, question: str, k: int = 3) -> 
             seen.add(c.key)
             out.append(c.key)
     return out[:k]
+
+
+def paths_for(s: Session, b: Business, notes: dict[int, str], limit: int = 6) -> list[dict]:
+    """질문 화면(US-18 D): 주어진 예정 입출금의 거래관계 경로를 P 근거로 만든다. 저장하지 않는다 (경보 run의 근거와 섞지 않게).
+
+    notes: {cash_event_id: "조건으로 바뀌는 일정" 같은 꼬리 설명}. 순서대로 번호를 붙인다.
+    """
+    ids = list(notes)[:limit]
+    if not ids:
+        return []
+    synced = {row["id"] for row in g.query("MATCH (e:CashEvent) WHERE e.cash_event_id IN $ids RETURN e.cash_event_id AS id", ids=ids)}
+    if synced != set(ids):
+        graph_service.sync(s, b)
+    from ..models import CashEvent
+
+    events = {e.cash_event_id: e for e in s.query(CashEvent).filter(CashEvent.cash_event_id.in_(ids))}
+    rows = {p["event_id"]: p for p in g.query(PATH_CYPHER, ids=ids)}
+    out = []
+    for eid in ids:
+        p, e = rows.get(eid), events.get(eid)
+        if p is None or e is None:
+            continue
+        contract = f"{p['counterparty']} {CONTRACT_KO.get(p['contract_type'], '계약')}" if p["contract_id"] else None
+        chain = [contract] if p["src_label"] == "Contract" else ["사업장", p["src_name"]] + ([contract] if contract else [])
+        out.append({"id": f"P{len(out) + 1}", "type": EvidenceRef.GRAPH_PATH.value, "ref": f"event:{eid}",
+                    "text": f"{' → '.join(chain)} → {e.due_date:%m/%d} {e.label} {e.amount:,}원 ({notes[eid]})"})
+    return out

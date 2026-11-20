@@ -146,9 +146,10 @@ def gather_alert_evidence(s, r) -> tuple[dict, bool, bool]:
     from . import evidence_service  # 순환 import 방지: evidence_service는 무거운 저장소들을 불러온다
 
     try:
-        out = evidence_service.collect(s, r)
+        out = evidence_service.collect(s, r, save=False)
     except Exception as e:  # neo4j.exceptions.ServiceUnavailable 등
         log.warning("경보 근거 검색 실패: %s", type(e).__name__)
+        s.rollback()
         return {"run_id": r.run_id, "evidence": [], "message": GRAPH_DOWN_MSG}, True, False
     return out, False, out["message"] == evidence_service.DOCS_DOWN
 

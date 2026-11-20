@@ -77,7 +77,7 @@ def _facts(p: ar.Plan, out: dict) -> list[explain_service.Fact]:
 def _template(p: ar.Plan, out: dict, evidence: list[dict]) -> list[str]:
     base, scen = out["base"], out["scenario"]
     fd = lambda d: explain_service.fmt(explain_service.Fact("", d, "date"))  # noqa: E731
-    t = [f"{', '.join(p.described())}을(를) 가정해 다시 계산했어요 [C1]."]
+    t = [f"{', '.join(p.described())} 조건으로 다시 계산했어요 [C1]."]
     if scen["first_shortage_date"]:
         t.append(f"그러면 {fd(scen['first_shortage_date'])}에 잔액이 0원 아래로 내려가 {scen['shortage_amount']:,}원이 부족해요 [C1].")
     else:
@@ -99,9 +99,10 @@ def ask(s: Session, b: Business, query: str) -> dict:
     cond = sc.Conditions(delay_counterparty_id=sales[p.delay[0]] if p.delay else None, delay_days=p.delay[1] if p.delay else 0,
                          revenue_drop_pct=p.revenue_drop_pct or 0, cost_rise_pct=p.cost_rise_pct or 0, rate_rise_pp=p.rate_rise_pp or 0)
     out = scenario_service.run(s, b, cond)
-    notes = {x["event_id"]: "조건 때문에 새로 모자라는 지급" for x in out["new_shortages"]}
-    for x in out["changes"]:
-        notes.setdefault(x["event_id"], "조건으로 바뀌는 일정")
+    # 원인(조건으로 바뀌는 일정)을 먼저, 결과(새로 모자라는 지급)를 뒤에 둔다. 근거는 최대 6개라 원인은 3개까지만.
+    notes = {x["event_id"]: "조건으로 바뀌는 일정" for x in out["changes"][:3]}
+    for x in out["new_shortages"]:
+        notes.setdefault(x["event_id"], "조건 때문에 새로 모자라는 지급")
     graph_down, message = False, None
     try:
         evidence = evidence_service.paths_for(s, b, notes)

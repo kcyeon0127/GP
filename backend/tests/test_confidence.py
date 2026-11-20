@@ -22,7 +22,7 @@ def test_assess_levels_and_cap():
 
 
 def paths_for_drivers(*docs: str):
-    def collect(s, r):
+    def collect(s, r, **_):
         ev = [{"id": f"P{i}", "type": "GRAPH_PATH", "ref": f"event:{e.cash_event_id}", "text": f"{e.due_date:%m/%d} {e.label} {e.amount:,}원"}
               for i, (e, _) in enumerate(forecast_service.drivers(s, r), 1)]
         ev += [{"id": f"D{i}", "type": "DOCUMENT_CHUNK", "ref": k, "text": "계약서 지급 조건", "score": 0.8} for i, k in enumerate(docs, 1)]
@@ -30,7 +30,7 @@ def paths_for_drivers(*docs: str):
     return collect
 
 
-NOTHING = lambda s, r: {"run_id": r.run_id, "evidence": [], "message": "근거 없음"}  # noqa: E731
+NOTHING = lambda s, r, **_: {"run_id": r.run_id, "evidence": [], "message": "근거 없음"}  # noqa: E731
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +55,7 @@ def test_alert_confidence_low_without_evidence(client, red, monkeypatch):
 
 
 def test_graph_down_caps_and_explains(client, red, monkeypatch):
-    def down(s, r):
+    def down(s, r, **_):
         raise RuntimeError("neo4j down")
     monkeypatch.setattr(evidence_service, "collect", down)
     out = client.post(f"/api/alerts/{red}/explain").json()

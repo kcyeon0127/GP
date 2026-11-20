@@ -29,7 +29,8 @@ DOCS_DOWN = "계약 문서 근거를 지금 불러오지 못해 거래관계 경
 CONTRACT_KO = {"SALES": "매출 계약", "PURCHASE": "매입 계약", "LEASE": "계약", "LOAN": "대출 약정"}
 
 
-def collect(s: Session, r: ForecastRun) -> dict:
+def collect(s: Session, r: ForecastRun, save: bool = True) -> dict:
+    """save=False: 근거 행을 다시 쓰지 않는다. 설명·신뢰도(US-18)는 '이유 보기'와 동시에 불릴 수 있어, 같은 run의 행을 두 요청이 지우고 쓰면 충돌한다."""
     drv = forecast_service.drivers(s, r)
     if not drv:
         return {"run_id": r.run_id, "evidence": [], "message": "근거 없음"}
@@ -69,7 +70,8 @@ def collect(s: Session, r: ForecastRun) -> dict:
             if score >= EVIDENCE_MIN_SCORE:
                 items.append(dict(ref_type=EvidenceRef.DOCUMENT_CHUNK, ref_id=chunk.key, text=f"{doc.title} {chunk.text}", score=round(score, 3)))
 
-    s.execute(delete(Evidence).where(Evidence.run_id == r.run_id))
+    if save:
+        s.execute(delete(Evidence).where(Evidence.run_id == r.run_id))
     out, n_p, n_d = [], 0, 0
     for rank, it in enumerate(items, 1):
         if it["ref_type"] == EvidenceRef.GRAPH_PATH:
@@ -78,7 +80,8 @@ def collect(s: Session, r: ForecastRun) -> dict:
         else:
             n_d += 1
             eid = f"D{n_d}"
-        s.add(Evidence(evidence_id=f"R{r.run_id}-{eid}", run_id=r.run_id, ref_type=it["ref_type"], ref_id=it["ref_id"], rank=rank, text=it["text"]))
+        if save:
+            s.add(Evidence(evidence_id=f"R{r.run_id}-{eid}", run_id=r.run_id, ref_type=it["ref_type"], ref_id=it["ref_id"], rank=rank, text=it["text"]))
         out.append({"id": eid, "type": it["ref_type"].value, "ref": it["ref_id"], "text": it["text"], **({"score": it["score"]} if "score" in it else {})})
     s.flush()
     msg = DOCS_DOWN if docs_down else (None if out else "근거 없음")

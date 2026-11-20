@@ -5,6 +5,9 @@ import { Link } from 'react-router-dom'
 import { CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, md, type ApiError, type ForecastDto, type SignalLevel } from '../../api.ts'
 import { won } from '../../data.ts'
+import ConfidenceChip from '../grounded/ConfidenceChip.tsx'
+import ProposalInsight from '../grounded/ProposalInsight.tsx'
+import type { ConfidenceDto, ExplanationDto } from '../grounded/types.ts'
 
 interface Result {
   signal: SignalLevel; first_shortage_date: string | null; shortage_amount: number | null
@@ -16,10 +19,11 @@ interface PlanDto {
   result: Result; status: string; evidence: { id: string; text: string | null }[]; evidence_missing: boolean
 }
 interface WithheldDto { kind: string; kind_ko: string; title: string; missing: string }
-interface HoldDto { code: 'NO_INFLOW' | 'NO_EVIDENCE'; message: string; missing: string[] }
+interface HoldDto { code: 'NO_INFLOW' | 'NO_EVIDENCE' | 'LOW_CONFIDENCE'; message: string; missing: string[] }
 interface ProposalDto {
   run_id: number; base: Result; plans: PlanDto[]; withheld: WithheldDto[]; hold: HoldDto | null
   evidence: { id: string; type: string; text: string }[]; message: string | null
+  confidence: ConfidenceDto | null; explanation: ExplanationDto | null
 }
 
 const SIGNAL_KO: Record<SignalLevel, string> = { RED: '위험', YELLOW: '주의', GREEN: '안전' }
@@ -117,7 +121,7 @@ export default function LiveAgent() {
           ) : p.hold ? (
             // 판단 보류: 수치를 보여 주지 않고 무엇을 등록하면 되는지만 안내한다 (US-11 AC-01·04)
             <div className="card" role="status">
-              <h2>판단을 보류했어요</h2>
+              <div className="g-head"><h2>판단을 보류했어요</h2>{p.confidence && <ConfidenceChip c={p.confidence} label="경보 신뢰도" />}</div>
               <p className="sub">{p.hold.message}</p>
               <ul className="hold-list">{p.hold.missing.map((m) => <li key={m}>{m}</li>)}</ul>
               {p.withheld.length > 0 && <p className="muted small">근거가 없어 보여 드리지 않은 후보: {p.withheld.map((w) => w.kind_ko).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</p>}
@@ -135,6 +139,7 @@ export default function LiveAgent() {
                 {p.message && <p className="muted" role="status">{p.message}</p>}
                 {sel && <CompareChart base={p.base} plan={sel} />}
               </div>
+              <ProposalInsight confidence={p.confidence} explanation={p.explanation} evidence={p.evidence} />
               {p.plans.length > 0 && (
                 <div className="card" style={{ overflowX: 'auto' }}>
                   <h2>후보 비교</h2>

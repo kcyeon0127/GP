@@ -6,6 +6,8 @@
 - US-11 판단 보류: 지급 조건을 바꾸자는 안이므로 그 계약의 문서 조항(D 근거)이 있어야 제시한다.
   조항이 없는 후보는 수치 없이 "근거 부족"으로만 알리고, 제시할 후보가 하나도 없으면 판단을 보류한다.
   경보일 뒤에 들어올 돈이 하나도 등록되지 않아 옮길 날이 없을 때도 보류하고 무엇을 등록할지 안내한다.
+- US-18: 경보 신뢰도(confidence_service)가 낮음이면 후보를 계산했더라도 판단을 보류한다(같은 _hold, 수치 비노출).
+  응답에는 신뢰도와 근거 인용 설명(explain_service: sLLM + 검증, 실패 시 템플릿)을 붙인다.
 """
 import json
 import logging
@@ -17,7 +19,7 @@ from sqlalchemy.orm import Session
 from ..domain import response as rp
 from ..domain.enums import CashDirection, CashSource, ContractType, PlanStatus, SignalLevel
 from ..models import Business, CashEvent, Contract, Document, DocumentChunk, FixedCost, ForecastRun, Loan, ResponsePlan
-from . import evidence_service, forecast_service, schedule_service
+from . import confidence_service, evidence_service, explain_service, forecast_service, schedule_service
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +39,33 @@ HOLD_NO_EVIDENCE = "후보는 찾았지만 계약 근거가 없어 판단을 보
 NEED_SALES = "매출처의 정산 일정(거래처·결제 조건)을 등록하세요."
 SERVER_DOWN = "근거 검색 서버(금융지도 그래프)에 연결되지 않았어요. 서버를 켠 뒤 다시 요청하세요."
 DOCS_SERVER_DOWN = "계약 문서 검색 서버(임베딩)에 연결되지 않았어요. 연결한 뒤 다시 요청하세요."
+HOLD_LOW_CONFIDENCE = "경보를 뒷받침하는 근거가 부족해 대응안 판단을 보류했어요. 아래 정보를 등록한 뒤 다시 요청하세요."
+PLAN_TASK = "가장 효과가 큰 대응안이 지금 일정과 비교해 무엇을 바꾸는지, 왜 도움이 되는지 근거를 들어 설명해 주세요."
+
+
+def _plan_explanation(base, plan: dict, evidence: list[dict]) -> dict:
+    """효과 1위 안 설명. 숫자는 계산 모듈 결과(C1)와 근거 텍스트에 있는 값만 쓴다."""
+    F = explain_service.Fact
+    b, res = _summary(base), plan["result"]
+    facts = [F("지금 4주 신호", SIGNAL_KO[base.signal], "text"), F("지금 4주 최저 잔액", b["alert_min_balance"])]
+    if base.first_shortage_date:
+        facts += [F("지금 최초 부족일", base.first_shortage_date, "date"), F("지금 부족액", base.shortage_amount)]
+    facts += [F("대응안", plan["title"], "text"), F("원래 지급일", plan["target"]["date"], "date"), F("원래 금액", plan["target"]["amount"])]
+    facts += [x for i, pt in enumerate(plan["parts"], 1) for x in (F(f"바꾼 지급일 {i}", pt["due_date"], "date"), F(f"바꾼 금액 {i}", pt["amount"]))]
+    facts += [F("대응안 4주 신호", SIGNAL_KO[SignalLevel(res["signal"])], "text"), F("대응안 4주 최저 잔액", res["alert_min_balance"])]
+    if res["first_shortage_date"]:
+        facts.append(F("대응안 최초 부족일", res["first_shortage_date"], "date"))
+    t = []
+    if base.first_shortage_date:
+        t.append(f"지금 일정대로면 {explain_service.fmt(facts[2])}에 {base.shortage_amount:,}원이 부족해요 [C1].")
+    else:
+        t.append(f"지금 일정대로면 4주 최저 잔액이 {b['alert_min_balance']:,}원으로 안전 잔액보다 낮아요 [C1].")
+    t.append(f"'{plan['title']}' 안을 따르면 4주 최저 잔액이 {b['alert_min_balance']:,}원에서 {res['alert_min_balance']:,}원으로 바뀌어요 [C1].")
+    refs = "".join(f"[{e['id']}]" for e in plan["evidence"][:3])
+    if refs:
+        t.append(f"이 안은 옮기는 지급의 거래관계 경로와 계약 조항을 근거로 했어요 {refs}.")
+    used = {e["id"] for e in plan["evidence"]}
+    return explain_service.explain(PLAN_TASK, [e for e in evidence if e["id"] in used], facts, t)
 
 
 def _kind_of(s: Session, e: CashEvent) -> str:
@@ -47,10 +76,7 @@ def _kind_of(s: Session, e: CashEvent) -> str:
 
 
 def _contract_of(s: Session, e: CashEvent) -> int | None:
-    if e.source_type == CashSource.CONTRACT:
-        return e.source_id
-    obj = s.get(FixedCost if e.source_type == CashSource.FIXED_COST else Loan, e.source_id)
-    return obj.contract_id if obj else None
+    return confidence_service.contract_of(s, e)
 
 
 def _adjusted_keys(s: Session, b: Business) -> set[tuple]:
@@ -145,7 +171,8 @@ def propose(s: Session, b: Business) -> dict:
                        adjusted=(e.source_type, e.source_id, e.due_date.isoformat()) in adjusted) for e in rows]
     st = rp.Setting(b.base_date, b.current_balance, b.safety_balance)
     base, plans = rp.propose(events, st)
-    out = {"run_id": r.run_id, "base": _summary(base), "plans": [], "withheld": [], "evidence": [], "hold": None, "message": None}
+    out = {"run_id": r.run_id, "base": _summary(base), "plans": [], "withheld": [], "evidence": [], "hold": None, "message": None,
+           "confidence": None, "explanation": None}
     if r.signal == SignalLevel.GREEN:
         out["message"] = NO_ALERT
         return out
@@ -155,6 +182,8 @@ def propose(s: Session, b: Business) -> dict:
         out["message"] = NO_PLAN
         return out
     evidence, server_msg = _evidence(s, r)
+    out["confidence"] = conf = confidence_service.for_alert(s, r, evidence, graph_down=server_msg == SERVER_DOWN,
+                                                            docs_down=server_msg == DOCS_SERVER_DOWN)
     texts = {ev["id"]: ev["text"] for ev in evidence}
     for plan in plans:
         target = by_id[plan.target.event_id]
@@ -176,7 +205,13 @@ def propose(s: Session, b: Business) -> dict:
     if not out["plans"]:
         missing = list(dict.fromkeys(w["missing"] for w in out["withheld"]))
         return _hold(out, base, "NO_EVIDENCE", HOLD_NO_EVIDENCE, missing)
+    if conf and conf["level"] == "LOW":
+        # 조항 근거가 있는 후보가 있어도 경보 자체의 근거가 약하면 보류한다. 이미 저장한 후보는 승인할 수 없게 밀어낸다.
+        s.execute(update(ResponsePlan).where(ResponsePlan.plan_id.in_([x["plan_id"] for x in out["plans"]])).values(status=PlanStatus.EXPIRED))
+        out["plans"], out["withheld"] = [], []
+        return _hold(out, base, "LOW_CONFIDENCE", HOLD_LOW_CONFIDENCE, conf["missing"] or [NEED_SALES])
     out["evidence"] = evidence
+    out["explanation"] = _plan_explanation(base, out["plans"][0], evidence)
     return out
 
 
@@ -184,6 +219,7 @@ def _hold(out: dict, base, code: str, message: str, missing: list[str]) -> dict:
     """판단 보류: 기준안도 신호만 남기고 잔액·부족액 같은 수치는 내보내지 않는다 (US-11 AC-04)."""
     out["base"] = {"signal": base.signal.value}
     out["hold"] = {"code": code, "message": message, "missing": missing}
+    out["explanation"] = explain_service.held(message)
     return out
 
 

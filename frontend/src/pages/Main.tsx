@@ -7,6 +7,7 @@ import WhyRisk from '../components/WhyRisk.tsx'
 import { DriversCard, LiveSignal } from '../components/live/AlertParts.tsx'
 import LiveChart from '../components/live/LiveChart.tsx'
 import LiveWhy from '../components/live/LiveWhy.tsx'
+import { AlertConfidence } from '../components/grounded/AlertInsight.tsx'
 import { useLiveData } from '../live.ts'
 import { md, useApiStatus } from '../api.ts'
 import { HORIZON, WINDOW, base, signalOf } from '../engine.ts'
@@ -45,6 +46,7 @@ function LiveHome() {
       <div className="main-grid">
         <div className="stack">
           <LiveSignal f={f} open={open} onToggle={() => setOpen((v) => !v)} />
+          {f.signal !== 'GREEN' && <AlertConfidence runId={f.run_id} />}
           {open && <DriversCard runId={f.run_id} trigger={trigger} />}
           <div className="split">
             <MiniMap stats={stats} />

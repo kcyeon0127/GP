@@ -16,4 +16,10 @@ EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
 EMBEDDING_DIM = 1024
 # 근거 검색에서 문서 조각을 근거로 인정하는 최소 유사도 (T23 Spike 잠정값)
 EVIDENCE_MIN_SCORE = float(os.getenv("EVIDENCE_MIN_SCORE", "0.55"))
+# 생성형 sLLM: OpenAI 호환 /v1/chat/completions (lab 서버 vLLM Qwen2.5-1.5B-Instruct, SSH 터널로 localhost:8100)
+# 계약 원문이 섞인 근거를 보내므로 내부 서버만 쓴다. 외부 API 폴백은 두지 않는다.
+LLM_URL = os.getenv("LLM_URL", "http://localhost:8100/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "Qwen2.5-1.5B-Instruct")
+LLM_API_KEY = os.getenv("LLM_API_KEY", EMBEDDING_API_KEY)  # 같은 lab 서버 키를 쓴다
+LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "20"))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5191").split(",")

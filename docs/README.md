@@ -59,6 +59,12 @@ https://docs.google.com/document/d/1nEYjC1LvDHLeroL29KqfdHv0PZI0LNSct_2dDeXKrDQ/
 [발표자료]
 https://canva.link/7g6fif9yf3o8hh4
 
+[ 양식 8 ] Sprint Planning( Sprint 2 : 2026. 11. 23. ~ 2026. 12. 18, US-14~17, 31SP )
+https://docs.google.com/document/d/1aENksJB4Of9v_mI5esk3E7nRWUqB-JlZlq_ACjvLkqA/edit?tab=t.0
+
+[발표자료]
+
+
 
 ---
 

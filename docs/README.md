@@ -65,7 +65,7 @@ https://canva.link/7g6fif9yf3o8hh4
 https://docs.google.com/document/d/1aENksJB4Of9v_mI5esk3E7nRWUqB-JlZlq_ACjvLkqA/edit?tab=t.0
 
 [발표자료]
-https://www.canva.com/d/r_pcsgcFvazc30u
+https://canva.link/kru95aa75p1d466
 
 
 ---

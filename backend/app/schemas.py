@@ -109,3 +109,5 @@ class ForecastOut(BaseModel):
     has_events: bool
     message: str
     daily: list[DailyBalance] | None = None
+    # US-15: 확정 지연일을 반영한 보수 예측 (signal·first_shortage_date·daily 등). applied=0이면 기본 예측과 같다.
+    conservative: dict | None = None

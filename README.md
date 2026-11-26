@@ -16,6 +16,7 @@
 ```bash
 docker compose up -d                                   # DB 2개
 ssh -N -L 8101:127.0.0.1:8101 lab &                     # 연구실 서버 bge-m3 임베딩 API (근거 검색용)
+ssh -N -L 8100:127.0.0.1:8100 lab &                     # (선택) sLLM: 근거 인용 설명·질문 해석. 없으면 기본 문장·규칙 해석으로 동작
 
 cd backend
 python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -30,7 +31,9 @@ cd ../frontend
 npm ci && npm run dev                                   # http://localhost:5173
 ```
 
-백엔드에 닿지 않으면 프론트는 합성 데이터 시연 화면으로 돌아간다. 5분 시연 대본과 실행 체크리스트는 [docs/demo.md](docs/demo.md).
+sLLM 설정은 `LLM_URL`(기본 http://localhost:8100/v1), `LLM_MODEL`(vLLM이 서빙하는 모델 이름, `curl localhost:8100/v1/models`로 확인), `LLM_API_KEY`(기본은 EMBEDDING_API_KEY와 같음), `LLM_TIMEOUT`(초, 기본 20). 계약 원문이 근거에 섞이므로 외부 LLM API는 쓰지 않는다.
+
+백엔드에 닿지 않으면 프론트는 합성 데이터 시연 화면으로 돌아간다 (말로 물어보기 화면은 시연 데이터로 대신 계산하지 않고 오류를 안내한다). 5분 시연 대본과 실행 체크리스트는 [docs/demo.md](docs/demo.md).
 
 ## 연구실 서버 (lab)
 

@@ -29,7 +29,8 @@ DOCS_DOWN = "계약 문서 근거를 지금 불러오지 못해 거래관계 경
 CONTRACT_KO = {"SALES": "매출 계약", "PURCHASE": "매입 계약", "LEASE": "계약", "LOAN": "대출 약정"}
 
 
-def collect(s: Session, r: ForecastRun) -> dict:
+def collect(s: Session, r: ForecastRun, save: bool = True) -> dict:
+    """save=False: 근거 행을 다시 쓰지 않는다. 설명·신뢰도(US-18)는 '이유 보기'와 동시에 불릴 수 있어, 같은 run의 행을 두 요청이 지우고 쓰면 충돌한다."""
     drv = forecast_service.drivers(s, r)
     if not drv:
         return {"run_id": r.run_id, "evidence": [], "message": "근거 없음"}
@@ -69,7 +70,8 @@ def collect(s: Session, r: ForecastRun) -> dict:
             if score >= EVIDENCE_MIN_SCORE:
                 items.append(dict(ref_type=EvidenceRef.DOCUMENT_CHUNK, ref_id=chunk.key, text=f"{doc.title} {chunk.text}", score=round(score, 3)))
 
-    s.execute(delete(Evidence).where(Evidence.run_id == r.run_id))
+    if save:
+        s.execute(delete(Evidence).where(Evidence.run_id == r.run_id))
     out, n_p, n_d = [], 0, 0
     for rank, it in enumerate(items, 1):
         if it["ref_type"] == EvidenceRef.GRAPH_PATH:
@@ -78,7 +80,8 @@ def collect(s: Session, r: ForecastRun) -> dict:
         else:
             n_d += 1
             eid = f"D{n_d}"
-        s.add(Evidence(evidence_id=f"R{r.run_id}-{eid}", run_id=r.run_id, ref_type=it["ref_type"], ref_id=it["ref_id"], rank=rank, text=it["text"]))
+        if save:
+            s.add(Evidence(evidence_id=f"R{r.run_id}-{eid}", run_id=r.run_id, ref_type=it["ref_type"], ref_id=it["ref_id"], rank=rank, text=it["text"]))
         out.append({"id": eid, "type": it["ref_type"].value, "ref": it["ref_id"], "text": it["text"], **({"score": it["score"]} if "score" in it else {})})
     s.flush()
     msg = DOCS_DOWN if docs_down else (None if out else "근거 없음")
@@ -102,3 +105,30 @@ def search_question(s: Session, business_id: int, question: str, k: int = 3) -> 
             seen.add(c.key)
             out.append(c.key)
     return out[:k]
+
+
+def paths_for(s: Session, b: Business, notes: dict[int, str], limit: int = 6) -> list[dict]:
+    """질문 화면(US-18 D): 주어진 예정 입출금의 거래관계 경로를 P 근거로 만든다. 저장하지 않는다 (경보 run의 근거와 섞지 않게).
+
+    notes: {cash_event_id: "조건으로 바뀌는 일정" 같은 꼬리 설명}. 순서대로 번호를 붙인다.
+    """
+    ids = list(notes)[:limit]
+    if not ids:
+        return []
+    synced = {row["id"] for row in g.query("MATCH (e:CashEvent) WHERE e.cash_event_id IN $ids RETURN e.cash_event_id AS id", ids=ids)}
+    if synced != set(ids):
+        graph_service.sync(s, b)
+    from ..models import CashEvent
+
+    events = {e.cash_event_id: e for e in s.query(CashEvent).filter(CashEvent.cash_event_id.in_(ids))}
+    rows = {p["event_id"]: p for p in g.query(PATH_CYPHER, ids=ids)}
+    out = []
+    for eid in ids:
+        p, e = rows.get(eid), events.get(eid)
+        if p is None or e is None:
+            continue
+        contract = f"{p['counterparty']} {CONTRACT_KO.get(p['contract_type'], '계약')}" if p["contract_id"] else None
+        chain = [contract] if p["src_label"] == "Contract" else ["사업장", p["src_name"]] + ([contract] if contract else [])
+        out.append({"id": f"P{len(out) + 1}", "type": EvidenceRef.GRAPH_PATH.value, "ref": f"event:{eid}",
+                    "text": f"{' → '.join(chain)} → {e.due_date:%m/%d} {e.label} {e.amount:,}원 ({notes[eid]})"})
+    return out
